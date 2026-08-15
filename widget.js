@@ -12,7 +12,7 @@
    ===================================================================== */
 (function () {
   'use strict';
-  var CSS = ":host{display:block;all:initial;font:16px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:light dark;}\n:host *{box-sizing:border-box}\n\n:host{\n  /* ---------------------------------------------------------------------\n     CSC brand palette, validated with the dataviz palette checker.\n     Accent must carry a data mark, so it needs >=3:1 against the surface it\n     sits on and a real separation from the de-emphasis gray:\n       light  #5036d5  contrast 7.4:1 on white, CVD dE 23.0 protan\n       dark   #6251ef  brand violet stepped to L 0.549 (inside the 0.48-0.67\n                       dark band), contrast >=3:1, CVD dE 22.5 protan\n     Rejected: #ff4dd8 sits at L 0.714, outside the dark band, and white text\n     on it is only 2.87:1. #00aeed / #56dedb / #f68af9 are all under 3:1 on the\n     light surface. They are used decoratively below, never for data.\n     --------------------------------------------------------------------- */\n  --plane:#f9f8f5; --surface-1:#ffffff;\n  --ink:#09100f; --ink-2:#4a5150; --muted:#7c8280;\n  --grid:#e6e4df; --axis:#c9c6bf; --border:rgba(9,16,15,0.10);\n  --accent:#5036d5; --accent-ink:#ffffff; --context:#7c8280;\n  --track:#e6e4df; --box:#c9c6bf; --bad:#d03b3b;\n  --brand-pink:#ff4dd8; --brand-teal:#56dedb; --brand-blue:#00aeed;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#5036d5 100%);\n}\n@media (prefers-color-scheme:dark){:host(:not([data-theme=light])){\n  --plane:#09100f; --surface-1:#121a19;\n  --ink:#f9f8f5; --ink-2:#c2c7c5; --muted:#868c8a;\n  --grid:#1e2423; --axis:#2c3332; --border:rgba(249,248,245,0.12);\n  --accent:#6251ef; --accent-ink:#ffffff; --context:#868c8a;\n  --track:#1e2423; --box:#2c3332; --bad:#e66767;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#6f62ff 100%);\n}}\n:host([data-theme=dark]){\n  --plane:#09100f; --surface-1:#121a19;\n  --ink:#f9f8f5; --ink-2:#c2c7c5; --muted:#868c8a;\n  --grid:#1e2423; --axis:#2c3332; --border:rgba(249,248,245,0.12);\n  --accent:#6251ef; --accent-ink:#ffffff; --context:#868c8a;\n  --track:#1e2423; --box:#2c3332; --bad:#e66767;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#6f62ff 100%);\n}\n*{box-sizing:border-box}\n.root{margin:0;background:var(--plane);color:var(--ink);\n font:16px/1.55 'Poppins','Poppins Fallback',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}\n.wrap{max-width:560px;margin:0 auto;padding:16px 16px 64px}\n.brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}\n.brand b{font-size:12px;letter-spacing:.08em;font-weight:600}\n.brand .dot{display:inline-block;width:9px;height:9px;border-radius:50%;\n background-image:var(--brand-grad);margin-right:7px}\n.tt{background:transparent;border:1px solid var(--border);color:var(--ink-2);border-radius:7px;\n font:inherit;font-size:12px;padding:5px 9px;cursor:pointer}\n.title{font-size:24px;font-weight:700;line-height:1.22;margin:0 0 8px;letter-spacing:-.015em}\n.lede{color:var(--ink-2);font-size:15px;margin:0 0 20px}\n.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;\n padding:18px 16px;margin-bottom:12px}\n.prog{display:flex;gap:5px;margin-bottom:18px}\n.prog i{flex:1;height:4px;border-radius:2px;background:var(--track);transition:background .2s}\n.prog i.on{background-image:var(--brand-grad)}\n.q{margin-bottom:26px}\n.q:last-child{margin-bottom:8px}\nlabel.qlab{display:block;font-size:16px;font-weight:600;margin-bottom:4px;line-height:1.35}\n.help{font-size:13px;color:var(--muted);margin-bottom:10px}\n.opts{display:grid;gap:7px}\n.opt{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:9px;\n padding:11px 12px;cursor:pointer;background:transparent;font:inherit;text-align:left;\n color:var(--ink);width:100%;line-height:1.35}\n.opt:hover{border-color:var(--accent)}\n.opt[aria-pressed=true],.opt.sel{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 8%,transparent)}\n.opt .tick{flex:0 0 18px;height:18px;border:1.5px solid var(--axis);border-radius:50%;margin-top:1px}\n.opt.multi .tick{border-radius:5px}\n.opt.sel .tick{border-color:var(--accent);background:var(--accent);\n box-shadow:inset 0 0 0 3px var(--surface-1)}\ninput[type=text],input[type=number],input[type=email],select{\n width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:9px;\n background:var(--surface-1);color:var(--ink)}\ninput:focus,select:focus,.opt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}\n.money{display:grid;grid-template-columns:112px 1fr;gap:8px}\n.zero{margin-top:9px;font-size:13.5px;color:var(--ink-2);display:flex;gap:8px;align-items:center;cursor:pointer}\n.err{color:var(--bad);font-size:13px;margin-top:7px;display:none}\n.err.on{display:block}\n.nav{display:flex;gap:8px;margin-top:6px}\n.btn{flex:1;font:inherit;font-size:15px;font-weight:600;padding:14px;border-radius:10px;cursor:pointer;\n border:1px solid var(--border);background:transparent;color:var(--ink)}\n.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:transparent}\n.btn:disabled{opacity:.5;cursor:default}\n.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}\n.consent{font-size:12.5px;color:var(--muted);margin-top:16px;line-height:1.55}\n\n/* ---------- results ---------- */\n.hero{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;\n padding:22px 18px;margin-bottom:12px;border-top:3px solid transparent;\n border-image:var(--brand-grad) 1;border-image-slice:1;border-width:3px 0 0 0}\n.hero .fig{font-size:54px;line-height:1;font-weight:700;letter-spacing:-.02em;color:var(--accent)}\n.hero .sub{color:var(--ink-2);font-size:15px;margin-top:9px}\n.hero .sub b{color:var(--ink)}\n.hero .fx{color:var(--muted);font-size:12.5px;margin-top:11px;padding-top:11px;border-top:1px solid var(--border)}\n.seg{display:flex;gap:5px;margin-bottom:12px}\n.seg button{flex:1;font:inherit;font-size:13px;padding:10px;border-radius:8px;cursor:pointer;\n border:1px solid var(--border);background:var(--surface-1);color:var(--ink-2)}\n.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}\n.seg button:disabled{opacity:.45;cursor:not-allowed}\n.note{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;\n padding:12px 13px;margin-bottom:12px;font-size:13px;color:var(--ink-2)}\n.note b{color:var(--ink)}\n.card h2{font-size:14px;margin:0 0 3px}\n.card .basis-mini{font-size:11.5px;color:var(--muted);margin:0 0 14px}\n.narr{font-size:14px;color:var(--ink-2);margin:14px 0 0}\n.narr b{color:var(--ink);font-weight:600}\nsvg{display:block;width:100%;overflow:visible}\ntext{font:11px 'Poppins','Poppins Fallback',system-ui,-apple-system,'Segoe UI',sans-serif;fill:var(--muted)}\ntext.you{fill:var(--accent);font-weight:700;font-size:12px}\ntext.val{fill:var(--ink-2);font-variant-numeric:tabular-nums}\n.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}\n.kpis.two{grid-template-columns:repeat(2,1fr)}\n.kpi{border:1px solid var(--border);border-radius:9px;padding:12px 9px;text-align:center}\n.kpi .v{font-size:26px;font-weight:700;line-height:1.1}\n.kpi .k{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.3}\n.kpi .mine{font-size:10.5px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);color:var(--ink-2)}\n.gap-row{display:grid;grid-template-columns:1fr 46px;gap:10px;align-items:center;padding:8px 0}\n.gap-row+.gap-row{border-top:1px solid var(--border)}\n.bar{height:7px;background:var(--track);border-radius:4px;overflow:hidden;margin-top:5px}\n.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}\n.gap-pct{text-align:right;font-size:13px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}\ndetails{margin-top:13px;border-top:1px solid var(--border);padding-top:10px}\nsummary{font-size:12px;color:var(--muted);cursor:pointer}\ntable{width:100%;border-collapse:collapse;margin-top:9px;font-size:12.5px}\nth,td{text-align:left;padding:5px 0;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}\nth{color:var(--muted);font-weight:600}\n.foot{color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.6}\n.tipbox{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--ink);\n color:var(--plane);padding:6px 9px;border-radius:6px;font-size:12px;z-index:99;white-space:nowrap}\n.spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.35);\n border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}\n@keyframes sp{to{transform:rotate(360deg)}}\n.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}\n";
+  var CSS = ":host{display:block;all:initial;font:16px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:light dark;}\n:host *{box-sizing:border-box}\n\n:host{\n  /* ---------------------------------------------------------------------\n     CSC brand palette, validated with the dataviz palette checker.\n     Accent must carry a data mark, so it needs >=3:1 against the surface it\n     sits on and a real separation from the de-emphasis gray:\n       light  #5036d5  contrast 7.4:1 on white, CVD dE 23.0 protan\n       dark   #6251ef  brand violet stepped to L 0.549 (inside the 0.48-0.67\n                       dark band), contrast >=3:1, CVD dE 22.5 protan\n     Rejected: #ff4dd8 sits at L 0.714, outside the dark band, and white text\n     on it is only 2.87:1. #00aeed / #56dedb / #f68af9 are all under 3:1 on the\n     light surface. They are used decoratively below, never for data.\n     --------------------------------------------------------------------- */\n  --plane:#f9f8f5; --surface-1:#ffffff;\n  --ink:#09100f; --ink-2:#4a5150; --muted:#7c8280;\n  --grid:#e6e4df; --axis:#c9c6bf; --border:rgba(9,16,15,0.10);\n  --accent:#5036d5; --accent-ink:#ffffff; --context:#7c8280;\n  --track:#e6e4df; --box:#c9c6bf; --bad:#d03b3b;\n  --brand-pink:#ff4dd8; --brand-teal:#56dedb; --brand-blue:#00aeed;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#5036d5 100%);\n}\n@media (prefers-color-scheme:dark){:host(:not([data-theme=light])){\n  --plane:#09100f; --surface-1:#121a19;\n  --ink:#f9f8f5; --ink-2:#c2c7c5; --muted:#868c8a;\n  --grid:#1e2423; --axis:#2c3332; --border:rgba(249,248,245,0.12);\n  --accent:#6251ef; --accent-ink:#ffffff; --context:#868c8a;\n  --track:#1e2423; --box:#2c3332; --bad:#e66767;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#6f62ff 100%);\n}}\n:host([data-theme=dark]){\n  --plane:#09100f; --surface-1:#121a19;\n  --ink:#f9f8f5; --ink-2:#c2c7c5; --muted:#868c8a;\n  --grid:#1e2423; --axis:#2c3332; --border:rgba(249,248,245,0.12);\n  --accent:#6251ef; --accent-ink:#ffffff; --context:#868c8a;\n  --track:#1e2423; --box:#2c3332; --bad:#e66767;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#6f62ff 100%);\n}\n*{box-sizing:border-box}\n.root{margin:0;background:var(--plane);color:var(--ink);\n font:16px/1.55 'Poppins','Poppins Fallback',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}\n.wrap{max-width:560px;margin:0 auto;padding:16px 16px 64px}\n.brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}\n.brand b{font-size:12px;letter-spacing:.08em;font-weight:600}\n.brand .dot{display:inline-block;width:9px;height:9px;border-radius:50%;\n background-image:var(--brand-grad);margin-right:7px}\n.tt{background:transparent;border:1px solid var(--border);color:var(--ink-2);border-radius:7px;\n font:inherit;font-size:12px;padding:5px 9px;cursor:pointer}\n.title{font-size:24px;font-weight:700;line-height:1.22;margin:0 0 8px;letter-spacing:-.015em}\n.lede{color:var(--ink-2);font-size:15px;margin:0 0 20px}\n.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;\n padding:18px 16px;margin-bottom:12px}\n.prog{display:flex;gap:5px;margin-bottom:18px}\n.prog i{flex:1;height:4px;border-radius:2px;background:var(--track);transition:background .2s}\n.prog i.on{background-image:var(--brand-grad)}\n.q{margin-bottom:26px}\n.q:last-child{margin-bottom:8px}\nlabel.qlab{display:block;font-size:16px;font-weight:600;margin-bottom:4px;line-height:1.35}\n.help{font-size:13px;color:var(--muted);margin-bottom:10px}\n.opts{display:grid;gap:7px}\n.opt{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:9px;\n padding:11px 12px;cursor:pointer;background:transparent;font:inherit;text-align:left;\n color:var(--ink);width:100%;line-height:1.35}\n.opt:hover{border-color:var(--accent)}\n.opt[aria-pressed=true],.opt.sel{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 8%,transparent)}\n.opt .tick{flex:0 0 18px;height:18px;border:1.5px solid var(--axis);border-radius:50%;margin-top:1px}\n.opt.multi .tick{border-radius:5px}\n.opt.sel .tick{border-color:var(--accent);background:var(--accent);\n box-shadow:inset 0 0 0 3px var(--surface-1)}\ninput[type=text],input[type=number],input[type=email],select{\n width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:9px;\n background:var(--surface-1);color:var(--ink)}\ninput:focus,select:focus,.opt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}\n.money{display:grid;grid-template-columns:112px 1fr;gap:8px}\n.zero{margin-top:9px;font-size:13.5px;color:var(--ink-2);display:flex;gap:8px;align-items:center;cursor:pointer}\n.err{color:var(--bad);font-size:13px;margin-top:7px;display:none}\n.err.on{display:block}\n.nav{display:flex;gap:8px;margin-top:6px}\n.btn{flex:1;font:inherit;font-size:15px;font-weight:600;padding:14px;border-radius:10px;cursor:pointer;\n border:1px solid var(--border);background:transparent;color:var(--ink)}\n.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:transparent}\n.btn:disabled{opacity:.5;cursor:default}\n.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}\n.consent{font-size:12.5px;color:var(--muted);margin-top:16px;line-height:1.55}\n\n/* ---------- results ---------- */\n.hero{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;\n padding:22px 18px;margin-bottom:12px;border-top:3px solid transparent;\n border-image:var(--brand-grad) 1;border-image-slice:1;border-width:3px 0 0 0}\n.hero .fig{font-size:54px;line-height:1;font-weight:700;letter-spacing:-.02em;color:var(--accent)}\n.hero .sub{color:var(--ink-2);font-size:15px;margin-top:9px}\n.hero .sub b{color:var(--ink)}\n.hero .fx{color:var(--muted);font-size:12.5px;margin-top:11px;padding-top:11px;border-top:1px solid var(--border)}\n.seg{display:flex;gap:5px;margin-bottom:12px}\n.seg button{flex:1;font:inherit;font-size:13px;padding:10px;border-radius:8px;cursor:pointer;\n border:1px solid var(--border);background:var(--surface-1);color:var(--ink-2)}\n.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}\n.seg button:disabled{opacity:.45;cursor:not-allowed}\n.note{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;\n padding:12px 13px;margin-bottom:12px;font-size:13px;color:var(--ink-2)}\n.note b{color:var(--ink)}\n.card h2{font-size:14px;margin:0 0 3px}\n.card .basis-mini{font-size:11.5px;color:var(--muted);margin:0 0 14px}\n.narr{font-size:14px;color:var(--ink-2);margin:14px 0 0}\n.narr b{color:var(--ink);font-weight:600}\nsvg{display:block;width:100%;overflow:visible}\ntext{font:11px 'Poppins','Poppins Fallback',system-ui,-apple-system,'Segoe UI',sans-serif;fill:var(--muted)}\ntext.you{fill:var(--accent);font-weight:700;font-size:12px}\ntext.val{fill:var(--ink-2);font-variant-numeric:tabular-nums}\n.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}\n.kpis.two{grid-template-columns:repeat(2,1fr)}\n.kpi{border:1px solid var(--border);border-radius:9px;padding:12px 9px;text-align:center}\n.kpi .v{font-size:26px;font-weight:700;line-height:1.1}\n.kpi .k{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.3}\n.kpi .mine{font-size:10.5px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);color:var(--ink-2)}\n.gap-row{display:grid;grid-template-columns:1fr 46px;gap:10px;align-items:center;padding:8px 0}\n.gap-row+.gap-row{border-top:1px solid var(--border)}\n.bar{height:7px;background:var(--track);border-radius:4px;overflow:hidden;margin-top:5px}\n.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}\n.gap-pct{text-align:right;font-size:13px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}\ndetails{margin-top:13px;border-top:1px solid var(--border);padding-top:10px}\nsummary{font-size:12px;color:var(--muted);cursor:pointer}\ntable{width:100%;border-collapse:collapse;margin-top:9px;font-size:12.5px}\nth,td{text-align:left;padding:5px 0;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}\nth{color:var(--muted);font-weight:600}\n.foot{color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.6}\n.tipbox{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--ink);\n color:var(--plane);padding:6px 9px;border-radius:6px;font-size:12px;z-index:99;white-space:nowrap}\n.spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.35);\n border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}\n@keyframes sp{to{transform:rotate(360deg)}}\n.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}\n\n/* ---------- stage flow ---------- */\n.stagebar{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--muted)}\n.stagebar .pips{display:flex;gap:4px;flex:1}\n.stagebar .pips i{flex:1;height:4px;border-radius:2px;background:var(--track)}\n.stagebar .pips i.done{background:var(--context)}\n.stagebar .pips i.now{background-image:var(--brand-grad)}\n.hero.mini .fig{font-size:40px}\n.hero.mini .sub{font-size:14px}\n.dbar{display:grid;grid-template-columns:1fr 42px;gap:10px;align-items:center;padding:7px 0}\n.dbar+.dbar{border-top:1px solid var(--border)}\n.dbar .lab{font-size:13.5px;line-height:1.3}\n.dbar.you .lab{font-weight:600;color:var(--ink)}\n.dbar .bar i{background:var(--context)}\n.dbar.you .bar i{background:var(--accent)}\n.dbar .pc{text-align:right;font-size:13px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}\n.dbar.you .pc{color:var(--accent)}\n.youtag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;\n color:var(--accent-ink);background:var(--accent);border-radius:4px;padding:1px 5px;margin-left:6px;\n vertical-align:1px}\n.twob{display:grid;gap:10px;margin-top:4px}\n.twob .row .lab{font-size:13.5px;margin-bottom:4px}\n.twob .row.you .lab{font-weight:600;color:var(--ink)}\n.twob .row .bar{height:22px;border-radius:6px}\n.twob .row .bar i{background:var(--context);border-radius:6px}\n.twob .row.you .bar i{background:var(--accent)}\n.twob .row .v{font-size:12.5px;color:var(--ink-2);margin-top:4px;font-variant-numeric:tabular-nums}\n.qtr{position:relative;height:34px;margin:10px 0 4px}\n.qtr .track{position:absolute;top:14px;left:0;right:0;height:6px;background:var(--track);border-radius:3px}\n.qtr .box{position:absolute;top:11px;height:12px;background:var(--box);border-radius:3px}\n.qtr .med{position:absolute;top:7px;width:2px;height:20px;background:var(--ink-2)}\n.qtr .me{position:absolute;top:4px;width:3px;height:26px;background:var(--accent);border-radius:2px}\n.qtr .melab{position:absolute;top:-2px;font-size:11px;font-weight:700;color:var(--accent);transform:translateX(-50%)}\n.sup{background:var(--surface-1);border:1px dashed var(--border);border-radius:10px;\n padding:14px 13px;margin-bottom:12px;font-size:13.5px;color:var(--ink-2)}\n";
   var SHELL_HTML = '<div class="root"><div id="app" aria-live="polite"></div>' +
                    '<div class="foot" id="foot"></div><div class="tipbox" id="tip" role="status"></div></div>';
 
@@ -90,6 +90,27 @@
     let DEF = null, Q = {}, SCREENS = [], screen = 0, answers = {}, startedAt = Date.now();
     let RESULT = null, activeCut = 'by_level';
 
+    /* ===================================================================== *
+       STAGE_FLOW
+       Stage 1 is the compensation module and is untouched: same screens, same
+       submit_response call, same results screen. Stages 2-7 come from
+       DEF.stages[] and go through submit_stage, which returns that stage's
+       interim comparison in the same round trip as the write.
+     * ===================================================================== */
+    let STAGE = 1, STAGE_RESULT = null, FINAL = null, PROGRESS = null;
+    const STAGE_MAX = 7;
+    const stageDef = n => (DEF.stages || []).find(x => x.n === n) || null;
+
+    /* Fire and forget. Analytics must never be able to break a submission, so
+       every call is unawaited and every failure is swallowed. */
+    function logEvent(kind, extra){
+      try {
+        rpc('log_event', Object.assign({
+          p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
+          p_kind: kind, p_stage: STAGE }, extra || {})).catch(()=>{});
+      } catch (e) {}
+    }
+
     /* =====================================================================
        boot
        ===================================================================== */
@@ -103,21 +124,115 @@
           <p class="narr">${e.message}. Please try again shortly.</p></div>`);
       }
       DEF.questions.filter(q => q.type !== 'terminator').forEach(q => Q[q.key] = q);
+      // Q must cover every stage, not just stage 1: wire() looks options up by key
+      // to decide whether an answer reveals another question, and a missing entry
+      // throws on the first click of stage 2.
+      (DEF.stages || []).forEach(st => (st.questions || []).forEach(q => Q[q.key] = q));
       SCREENS = [...new Set(DEF.questions.filter(q => q.type !== 'terminator').map(q => q.screen))].sort();
       const p = new URLSearchParams(location.search);
       answers.__source = mount.dataset.src || p.get('src') || p.get('utm_source') || 'organic';
       startedAt = Date.now();
+
+      // Stop and resume. The device token already exists for dedup, so this costs
+      // no new identity and no email address. If the visitor has never started,
+      // get_progress returns {found:false} and we fall through to the survey.
+      try {
+        PROGRESS = await rpc('get_progress',
+          { p_survey_slug: CONFIG.slug, p_anon_token: deviceToken() });
+      } catch (e) { PROGRESS = null; }
+
+      if (PROGRESS && PROGRESS.found && (PROGRESS.stages_completed || []).length){
+        Object.assign(answers, PROGRESS.answers || {});
+        return drawResume();
+      }
+      logEvent('stage_view');
       drawScreen();
     })();
+
+    function drawResume(){
+      const done = PROGRESS.stages_completed || [];
+      const next = PROGRESS.next_stage;
+      const r = (DEF.resume && DEF.resume.copy) || {};
+      const nextTitle = next ? (stageDef(next) || {}).title : null;
+      logEvent('resume');
+      render(`
+        <div class="title">Welcome back</div>
+        <p class="lede">${next
+          ? `You finished ${done.length} of ${STAGE_MAX} sections.`
+          : `You've finished all ${STAGE_MAX} sections.`}</p>
+        <div class="card">
+          <h2>${next ? 'Carry on from &ldquo;' + nextTitle + '&rdquo;?' : 'Everything is saved'}</h2>
+          <p class="narr">Your answers are saved on this device. Nothing is tied to your
+            name or your email address.</p>
+          <div class="nav" style="margin-top:16px">
+            ${next ? `<button class="btn pri" type="button" id="resumeGo">Carry on</button>` : ''}
+            <button class="btn" type="button" id="resumeResults">Show me my results</button>
+          </div>
+        </div>`);
+      const go = $('#resumeGo');
+      if (go) go.onclick = () => { STAGE = next; screen = 0; startedAt = Date.now(); drawScreen(); };
+      $('#resumeResults').onclick = () => replayStage(
+        Math.max.apply(null, done.concat([1])));
+    }
+
+    /* Re-runs the last completed stage's submit to get its comparison back. The
+       upsert makes that idempotent — it rewrites the same answers to the same
+       response row — so "show me my results" costs one round trip and no data. */
+    async function replayStage(n){
+      render(`<div class="card" style="text-align:center;color:var(--muted)">Loading…</div>`);
+      STAGE = n;
+      if (n === 1){
+        // Stage 1's comparison comes back from submit_response, which will return
+        // duplicate:true and the same payload as the first time.
+        const payload = {};
+        (DEF.questions || []).filter(q => q.type !== 'terminator').forEach(q => {
+          if (answers[q.key] !== undefined) payload[q.key] = answers[q.key]; });
+        payload.base_salary_currency = answers.base_salary_currency || 'USD';
+        const r = await rpc('submit_response', {
+          p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(), p_answers: payload,
+          p_source: answers.__source, p_referrer: null, p_duration_ms: 999999,
+          p_honeypot: null, p_ip: null });
+        if (!r || r.ok === false) return submitFailed(r);
+        RESULT = r;
+        activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
+          ? 'by_level' : 'by_economy';
+        return drawResults();
+      }
+      const payload = {};
+      (stageDef(n).questions || []).forEach(q => {
+        if (answers[q.key] !== undefined) payload[q.key] = answers[q.key]; });
+      const r = await rpc('submit_stage', {
+        p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
+        p_stage: n, p_answers: payload, p_duration_ms: 999999 });
+      if (!r || r.ok === false) return submitFailed(r);
+      STAGE_RESULT = r; FINAL = r.final || null;
+      drawStageResults();
+    }
 
     function render(html){ app.innerHTML = html; }
 
     /* =====================================================================
        survey screens
        ===================================================================== */
-    function questionsFor(s){
-      return DEF.questions.filter(q => q.screen === s && q.type !== 'terminator')
-        .filter(q => !q.show_if || Object.entries(q.show_if).every(([k,v]) => answers[k] === v));
+    /* Stage 1 keeps its authored screen numbers. Stages 2-7 are chunked at six
+       questions a screen — stage 7 has twelve, and twelve at once after six
+       sections is where people close the tab. */
+    function screensFor(stage){
+      if (stage === 1){
+        const nums = [...new Set(DEF.questions.filter(q => q.type !== 'terminator')
+          .map(q => q.screen))].sort();
+        return nums.map(n => DEF.questions.filter(q => q.screen === n && q.type !== 'terminator'));
+      }
+      const qs = (stageDef(stage) || {}).questions || [];
+      const out = [];
+      for (let i = 0; i < qs.length; i += 6) out.push(qs.slice(i, i + 6));
+      return out;
+    }
+
+    function questionsFor(i){
+      const sc = screensFor(STAGE)[i] || [];
+      return sc.filter(q => !q.show_if ||
+        Object.entries(q.show_if).every(([k,v]) => answers[k] === v));
     }
 
     function fieldHTML(q){
@@ -192,29 +307,50 @@
       return m[answers.country] || 'USD';
     }
 
+    function stageBar(){
+      if (STAGE === 1 && !(DEF.stages || []).length) return '';
+      const sd = stageDef(STAGE) || {};
+      let pips = '';
+      for (let i = 1; i <= STAGE_MAX; i++)
+        pips += `<i class="${i < STAGE ? 'done' : i === STAGE ? 'now' : ''}"></i>`;
+      return `<div class="stagebar"><span>Section ${STAGE} of ${STAGE_MAX}</span>
+        <span class="pips">${pips}</span></div>`;
+    }
+
     function drawScreen(){
-      const s = SCREENS[screen], qs = questionsFor(s);
-      const first = screen === 0;
+      // The results footer lives outside #app and persists across renders, so it has
+      // to be cleared by hand or stage 1's vintage line trails every later screen.
+      if ($('#foot')) $('#foot').innerHTML = '';
+      const scr = screensFor(STAGE), qs = questionsFor(screen);
+      const first = screen === 0, last = screen === scr.length - 1;
+      const sd = stageDef(STAGE) || {};
+      const veryFirst = STAGE === 1 && first;
       render(`
-        ${first ? (mount.dataset.hideTitle !== undefined ? '' : `<div class="title">${DEF.title}</div>`) + `<p class="lede">${DEF.subtitle}</p>` : ''}
-        <div class="prog" role="progressbar" aria-valuenow="${screen+1}" aria-valuemax="${SCREENS.length}">
-          ${SCREENS.map((_,i)=>`<i class="${i<=screen?'on':''}"></i>`).join('')}</div>
+        ${veryFirst ? `<h1>${DEF.title}</h1><p class="lede">${DEF.subtitle}</p>` : ''}
+        ${STAGE > 1 && first ? `<div class="title">${sd.title}</div>
+           <p class="lede">${sd.subtitle || ''}</p>` : ''}
+        ${stageBar()}
+        <div class="prog" role="progressbar" aria-valuenow="${screen+1}" aria-valuemax="${scr.length}">
+          ${scr.map((_,i)=>`<i class="${i<=screen?'on':''}"></i>`).join('')}</div>
         <div class="card">${qs.map(fieldHTML).join('')}</div>
         <div class="hp"><label>Leave this empty<input type="text" id="hp" tabindex="-1" autocomplete="off"></label></div>
         <div class="nav">
           ${screen>0?`<button class="btn" type="button" id="back">Back</button>`:''}
           <button class="btn pri" type="button" id="next">
-            ${screen===SCREENS.length-1?'See my comparison':'Continue'}</button>
+            ${last ? (STAGE === 1 ? 'See my comparison' : 'See how I compare') : 'Continue'}</button>
         </div>
-        ${first?`<p class="consent">${DEF.consent_text}</p>`:''}`);
+        ${STAGE > 1 ? `<p class="consent">${(DEF.resume && DEF.resume.copy &&
+            DEF.resume.copy.on_leave) || 'Saved on this device — you can come back any time.'}</p>` : ''}
+        ${veryFirst?`<p class="consent">${DEF.consent_text}</p>`:''}`);
       wire();
+      qs.forEach(q => logEvent('question_view', { p_question: q.key }));
       window.scrollTo({ top: 0 });
     }
 
     function wire(){
       app.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
         answers[b.dataset.q] = b.dataset.v; clearErr(b.dataset.q);
-        if ((Q[b.dataset.q].options || []).some(o => o.reveals)) drawScreen();
+        if (revealsSomething(b.dataset.q)) drawScreen();
         else { app.querySelectorAll(`[data-q="${b.dataset.q}"]`).forEach(x=>{
           x.classList.toggle('sel', x===b); x.setAttribute('aria-pressed', x===b); }); }
       });
@@ -249,13 +385,40 @@
       $('#next').onclick = onNext;
     }
 
+    /* Module A put `reveals` on the OPTION ('Something else' reveals a text box).
+       The staged questions put it on the QUESTION (courses_taken reveals two
+       follow-ups), so the original check missed them: the follow-ups counted as
+       visible for validation but were never rendered, and Continue then failed with
+       no error anywhere on screen. Rather than depend on where `reveals` was
+       written, ask the only question that matters — does anything in this stage
+       branch on this key. */
+    function revealsSomething(key){
+      if ((Q[key] && Q[key].options || []).some(o => o.reveals)) return true;
+      if (Q[key] && Q[key].reveals) return true;
+      const pool = STAGE === 1 ? (DEF.questions || [])
+                               : ((stageDef(STAGE) || {}).questions || []);
+      return pool.some(q => q.show_if && Object.keys(q.show_if).indexOf(key) >= 0);
+    }
+
     function showErr(k, msg){ const e = app.querySelector(`[data-err="${k}"]`);
-      if (e){ e.textContent = msg; e.classList.add('on'); } }
+      if (e){ e.textContent = msg; e.classList.add('on'); return; }
+      // No slot for this error means the question is required but not on screen —
+      // a branching bug, not a respondent mistake. Say so rather than leaving a
+      // Continue button that does nothing, which is what the reveal bug produced.
+      let box = app.querySelector('#stuck');
+      if (!box){
+        box = document.createElement('div');
+        box.id = 'stuck'; box.className = 'err on';
+        (app.querySelector('.nav') || app).insertAdjacentElement('beforebegin', box);
+      }
+      box.textContent = 'Something went wrong with this question. Please reload the page — your answers are saved.';
+      if (console && console.warn) console.warn('no error slot for', k, msg);
+    }
     function clearErr(k){ const e = app.querySelector(`[data-err="${k}"]`);
       if (e) e.classList.remove('on'); }
 
     function onNext(){
-      const qs = questionsFor(SCREENS[screen]);
+      const qs = questionsFor(screen);
       let ok = true;
       for (const q of qs){
         const v = answers[q.key];
@@ -280,8 +443,11 @@
         }
       }
       if (!ok) return app.querySelector('.err.on')?.scrollIntoView({ block:'center', behavior:'smooth' });
-      if (screen < SCREENS.length - 1){ screen++; return drawScreen(); }
-      submit();
+      qs.forEach(q => { if (answers[q.key] !== undefined) logEvent('question_answer', { p_question: q.key }); });
+      if (screen < screensFor(STAGE).length - 1){ screen++; return drawScreen(); }
+      logEvent('stage_complete');
+      if (STAGE === 1) return submit();
+      submitStage();
     }
 
     /* =====================================================================
@@ -334,6 +500,228 @@
         app.querySelector('.nav').before(box); }
       box.innerHTML = `<b>${msg}</b>`;
       box.scrollIntoView({ block:'center', behavior:'smooth' });
+    }
+
+    /* =====================================================================
+       stages 2-7: submit and interim comparison
+       ===================================================================== */
+    async function submitStage(){
+      const btn = $('#next');
+      btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Comparing…';
+      const payload = {};
+      (stageDef(STAGE).questions || []).forEach(q => {
+        // A question hidden by its show_if was never asked, so it must not be sent.
+        const shown = !q.show_if ||
+          Object.entries(q.show_if).every(([k,v]) => answers[k] === v);
+        if (shown && answers[q.key] !== undefined) payload[q.key] = answers[q.key];
+      });
+      try {
+        const r = await rpc('submit_stage', {
+          p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
+          p_stage: STAGE, p_answers: payload, p_duration_ms: Date.now() - startedAt });
+        if (!r || r.ok === false) return submitFailed(r);
+        STAGE_RESULT = r; FINAL = r.final || null;
+        drawStageResults();
+      } catch (e){ submitFailed({ error: 'network', message: e.message }); }
+    }
+
+    /* ---- one card, dispatched on the style the definition declared ---------- */
+    function pct(n){ return Math.max(0, Math.min(100, Math.round(n))); }
+
+    function cardBasis(c){
+      const b = c.basis || {};
+      return `<p class="basis-mini">${b.label || ''}${c.n != null ? ' · n=' + c.n : ''}${
+        b.suppressed && b.suppressed_from
+          ? ' · not enough ' + midSentence(b.suppressed_from) + ' yet' : ''}</p>`;
+    }
+
+    function suppressedCard(c){
+      return `<div class="sup"><b>${c.title || ''}</b><br>
+        Not enough responses to show this yet${c.needed ? ' — ' + c.needed + ' more needed' : ''}.
+        It unlocks as more people take the survey.</div>`;
+    }
+
+    function styleCard(c, isHero){
+      if (!c) return '';
+      if (c.available === false) return suppressedCard(c);
+      const head = `<h2>${c.title || ''}</h2>${cardBasis(c)}`;
+
+      if (c.style === 'share_yes'){
+        const mine = c.your_answer === 'yes';
+        return `<div class="card ${isHero?'hero mini':''}">
+          ${isHero ? `<div class="fig">${c.share_yes}%</div>
+            <div class="sub">${fillHeadline(c)}</div>${cardBasis(c)}`
+            : `${head}<div class="kpis two">
+               <div class="kpi"><div class="v">${c.share_yes}%</div><div class="k">of your peers said yes</div>
+                 <div class="mine">You: ${mine ? 'yes' : 'no'}</div></div>
+               <div class="kpi"><div class="v">${100 - c.share_yes}%</div><div class="k">said no</div></div>
+            </div>`}</div>`;
+      }
+
+      if (c.style === 'distribution_choice'){
+        const rows = (c.distribution || []).map(d => `
+          <div class="dbar ${d.is_you?'you':''}">
+            <div><div class="lab">${d.label}${d.is_you?'<span class="youtag">YOU</span>':''}</div>
+              <div class="bar"><i style="width:${pct(d.share)}%"></i></div></div>
+            <div class="pc">${d.share}%</div></div>`).join('');
+        return `<div class="card">${head}${rows}
+          ${c.share_your_answer != null && c.your_answer_label ? `<p class="narr">
+            <b>${c.share_your_answer}%</b> of your peers answered the same as you.</p>` : ''}</div>`;
+      }
+
+      if (c.style === 'count_vs_peers'){
+        const max = Math.max(c.total_options, c.your_count, c.p75_count);
+        const X = v => (v / max) * 100;
+        return `<div class="card ${isHero?'hero mini':''}">
+          ${isHero ? `<div class="fig">${c.your_count}<span style="font-size:22px;color:var(--ink-2)">
+             /${c.total_options}</span></div>
+            <div class="sub">${fillHeadline(c)}</div>` : head}
+          <div class="qtr">
+            <div class="track"></div>
+            <div class="box" style="left:${X(c.p25_count)}%;width:${X(c.p75_count)-X(c.p25_count)}%"></div>
+            <div class="med" style="left:${X(c.median_count)}%"></div>
+            <div class="me" style="left:${X(c.your_count)}%"></div>
+            <div class="melab" style="left:${X(c.your_count)}%">you</div>
+          </div>
+          <p class="narr">Middle half of your peers: <b>${c.p25_count}&ndash;${c.p75_count}</b>.
+            Median <b>${c.median_count}</b>. You're higher than <b>${c.percentile}%</b> of them.</p>
+          ${isHero ? cardBasis(c) : ''}
+          <p class="foot" style="margin-top:10px">Counts people who picked at least one.</p></div>`;
+      }
+
+      if (c.style === 'distribution_numeric'){
+        const rows = (c.buckets || []).map(b => `
+          <div class="dbar ${b.is_you?'you':''}">
+            <div><div class="lab">${b.label} year${b.label==='1'?'':'s'}${b.is_you?'<span class="youtag">YOU</span>':''}</div>
+              <div class="bar"><i style="width:${pct(b.share)}%"></i></div></div>
+            <div class="pc">${b.share}%</div></div>`).join('');
+        return `<div class="card ${isHero?'hero mini':''}">
+          ${isHero ? `<div class="fig">${c.your_value}<span style="font-size:22px;color:var(--ink-2)">
+              yr${c.your_value===1?'':'s'}</span></div>
+            <div class="sub">${fillHeadline(c)}</div>` : head}
+          <div style="margin-top:14px">${rows}</div>
+          <p class="narr">Median <b>${c.median}</b>. You're longer-serving than
+            <b>${c.percentile}%</b> of your peers.</p>
+          ${isHero ? cardBasis(c) : ''}</div>`;
+      }
+
+      if (c.style === 'gap_vs_peers'){
+        const g = c.gaps || [];
+        if (!g.length) return `<div class="card">${head}
+          <p class="narr">Nothing your peers are doing that you aren't.</p></div>`;
+        return `<div class="card">${head}
+          ${g.map(x => `<div class="gap-row">
+            <div><div>${x.label}</div><div class="bar"><i style="width:${pct(x.share)}%"></i></div></div>
+            <div class="gap-pct">${x.share}%</div></div>`).join('')}</div>`;
+      }
+      return '';
+    }
+
+    /* Headlines carry {placeholders} that name keys in the payload. The generator
+       validates every one of them against the style's contract, so a missing value
+       here means the payload changed and the build check was skipped. */
+    function fillHeadline(c){
+      const h = c.headline || '';
+      return h.replace(/\{(\w+)\}/g, (m, k) => c[k] != null ? c[k] : '');
+    }
+
+    function drawStageResults(){
+      const cuts = STAGE_RESULT.results || {};
+      const res = cuts[activeCut] || cuts.by_level || cuts.by_economy || {};
+      const alt = activeCut === 'by_level' ? 'by_economy' : 'by_level';
+      const sd = stageDef(STAGE) || {};
+      const last = STAGE === STAGE_MAX;
+      const cutOk = k => cuts[k] && cuts[k].hero && cuts[k].hero.available !== false;
+
+      render(`
+        <div class="title">${last ? "Here's the whole picture" : sd.title}</div>
+        ${stageBar()}
+        <div class="seg" role="group">
+          ${(DEF.display_cuts||[]).map(c => `<button data-scut="${c.key}"
+            aria-pressed="${activeCut===c.key}" ${cutOk(c.key)?'':'disabled'}>${c.toggle_label}</button>`).join('')}
+        </div>
+        ${styleCard(res.hero, true)}
+        ${(res.cards || []).map(c => styleCard(c, false)).join('')}
+        ${last ? finalHTML() : ''}
+        ${last ? unlockHTML(null) : ''}
+        ${last ? asksHTML() : ''}
+        ${last ? '' : continueHTML()}
+        <p class="foot" id="sfoot"></p>`);
+
+      if ($('#foot')) $('#foot').innerHTML = '';
+      $('#sfoot').innerHTML = `No comparison is shown on fewer than
+        ${STAGE_RESULT.threshold || 30} responses. Individual answers are never published
+        or attributed. Sections you've finished: ${(STAGE_RESULT.stages_completed||[]).join(', ')}.`;
+
+      app.querySelectorAll('[data-scut]').forEach(b => b.onclick = () => {
+        activeCut = b.dataset.scut; drawStageResults(); window.scrollTo({top:0,behavior:'smooth'}); });
+      const go = $('#stageGo');
+      if (go) go.onclick = () => {
+        logEvent('continue_click');
+        STAGE++; screen = 0; startedAt = Date.now(); drawScreen(); };
+      const stop = $('#stageStop');
+      if (stop) stop.onclick = () => { logEvent('leave_click'); drawStopped(); };
+      if (last) wireResults();
+      logEvent('results_view');
+      window.scrollTo({ top: 0 });
+    }
+
+    function continueHTML(){
+      const next = stageDef(STAGE + 1) || {};
+      return `<div class="card">
+        <h2>Next: ${next.title || ''}</h2>
+        <p class="narr">${next.subtitle || ''} About
+          ${Math.max(1, Math.round((next.estimated_seconds||60)/60))} minute${
+          (next.estimated_seconds||60) >= 90 ? 's' : ''}.</p>
+        <div class="nav" style="margin-top:14px">
+          <button class="btn pri" type="button" id="stageGo">Keep going</button>
+          <button class="btn" type="button" id="stageStop">I'm done for now</button>
+        </div></div>`;
+    }
+
+    function drawStopped(){
+      if ($('#foot')) $('#foot').innerHTML = '';
+      render(`<div class="title">Saved</div>
+        <div class="card">
+          <h2>You can pick this up any time</h2>
+          <p class="narr">Your answers are saved on this device. Come back to this page and
+            you'll carry on from where you stopped. Nothing is tied to your name or your
+            email address.</p>
+        </div>
+        ${unlockHTML(null)}
+        ${asksHTML()}`);
+      wireResults();
+      window.scrollTo({ top: 0 });
+    }
+
+    /* ---- the cross-stage cards ---------------------------------------------- */
+    /* No cut toggle on these, deliberately. Within the IC band, peers who took a
+       course earn 20% more; pooled across everyone the same card reads 8% less,
+       because execs earn most and take fewest courses. Letting someone flip a
+       toggle and watch the answer change sign would cost more trust than a
+       suppressed card does. */
+    function finalHTML(){
+      const cards = FINAL || [];
+      if (!cards.length) return '';
+      const fs = DEF.final_screen || {};
+      const body = cards.map(c => {
+        if (c.available === false) return `<div class="sup"><b>${c.title}</b><br>
+          ${c.message || 'Not enough responses in your group yet to split this fairly.'}</div>`;
+        const max = Math.max(c.lo.median, c.hi.median) || 1;
+        const row = x => `<div class="row ${x.is_you?'you':''}">
+          <div class="lab">${x.label}${x.is_you?'<span class="youtag">YOU</span>':''}</div>
+          <div class="bar"><i style="width:${pct(x.median/max*100)}%"></i></div>
+          <div class="v">${usd(x.median)} median · n=${x.n}</div></div>`;
+        return `<div class="card"><h2>${c.title}</h2>
+          <p class="basis-mini">${(c.basis||{}).label || ''} · base salary</p>
+          <div class="twob">${row(c.lo)}${row(c.hi)}</div>
+          <p class="narr">Median base salary is ${c.gap_pct >= 0
+            ? `<b>${c.gap_pct}% higher</b>` : `<b>${Math.abs(c.gap_pct)}% lower</b>`}
+            among ${midSentence(c.hi.label)}.</p>
+          ${c.caveat ? `<p class="foot" style="margin-top:8px">${c.caveat}</p>` : ''}</div>`;
+      }).join('');
+      return `<div class="note"><b>${fs.headline || "Here's the whole picture"}</b><br>
+        ${fs.intro || ''}</div>${body}`;
     }
 
     /* =====================================================================
@@ -507,6 +895,7 @@
         </div>
       </div>
 
+      ${continuePromptHTML()}
       ${unlockHTML(otherCut)}
       ${asksHTML()}`);
 
@@ -514,6 +903,23 @@
         ${RESULT.threshold} responses. Individual answers are never published or attributed.
         Figures normalised to US dollars.`;
       wireResults();
+    }
+
+    /* The offer to carry on, shown under the full stage 1 results and never above
+       them. Stage 1's six cards are all still there: weakening the one screen that
+       converts, in order to manufacture a reason to continue, would break the promise
+       the landing page makes. The reason to continue is the cross-stage cards at the
+       end, which are genuinely impossible from the pay questions alone. */
+    function continuePromptHTML(){
+      const sd = stageDef(1) || {};
+      const cp = sd.continue_prompt;
+      if (!cp || !(DEF.stages || []).length) return '';
+      return `<div class="card" style="border-image:var(--brand-grad) 1;border-image-slice:1;border-width:0 0 0 3px">
+        <h2>${cp.headline}</h2>
+        <p class="narr">${cp.body}</p>
+        <div class="nav" style="margin-top:14px">
+          <button class="btn pri" type="button" id="s1go">${cp.cta}</button>
+        </div></div>`;
     }
 
     function unlockHTML(otherCut){
@@ -550,6 +956,11 @@
     }
 
     function wireResults(){
+      const s1 = $('#s1go');
+      if (s1) s1.onclick = () => {
+        logEvent('continue_click');
+        STAGE = 2; screen = 0; startedAt = Date.now(); drawScreen();
+      };
       app.querySelectorAll('[data-cut]').forEach(b => b.onclick = () => {
         activeCut = b.dataset.cut; drawResults(); window.scrollTo({top:0,behavior:'smooth'}); });
       app.querySelectorAll('[data-tip]').forEach(el => {
