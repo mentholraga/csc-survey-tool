@@ -98,8 +98,33 @@
        interim comparison in the same round trip as the write.
      * ===================================================================== */
     let STAGE = 1, STAGE_RESULT = null, FINAL = null, PROGRESS = null;
-    const STAGE_MAX = 7;
+    const stageCount = () => ((DEF.stages || []).length || 1);
     const stageDef = n => (DEF.stages || []).find(x => x.n === n) || null;
+
+    /* Section 1 is now seventeen questions and writes nothing to the server until
+       the last of them, so a reload halfway through would throw all of it away. The
+       draft is kept on the device only — same place the anonymous token already
+       lives, no new identity, nothing sent anywhere — and is cleared the moment the
+       server has the answers. */
+    const DRAFT_KEY = 'csc_bm_draft';
+    function saveDraft(){
+      try {
+        if (STAGE !== 1) return;
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(
+          { v: 1, slug: CONFIG.slug, screen: screen, answers: answers, at: Date.now() }));
+      } catch (e) {}
+    }
+    function readDraft(){
+      try {
+        const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+        if (!d || d.slug !== CONFIG.slug) return null;
+        // A month-old draft is a different person's session more often than it is the
+        // same person finishing what they started.
+        if (Date.now() - (d.at || 0) > 30 * 24 * 3600 * 1000) return null;
+        return Object.keys(d.answers || {}).filter(k => k !== '__source').length ? d : null;
+      } catch (e) { return null; }
+    }
+    function clearDraft(){ try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
 
     /* Fire and forget. Analytics must never be able to break a submission, so
        every call is unawaited and every failure is swallowed. */
@@ -142,12 +167,46 @@
       } catch (e) { PROGRESS = null; }
 
       if (PROGRESS && PROGRESS.found && (PROGRESS.stages_completed || []).length){
+        clearDraft();
         Object.assign(answers, PROGRESS.answers || {});
         return drawResume();
+      }
+      const draft = readDraft();
+      if (draft){
+        Object.assign(answers, draft.answers || {});
+        answers.__source = draft.answers.__source || answers.__source;
+        return drawDraftResume(draft);
       }
       logEvent('stage_view');
       drawScreen();
     })();
+
+    function drawDraftResume(draft){
+      const answered = Object.keys(draft.answers || {})
+        .filter(k => k !== '__source' && k !== 'base_salary_currency').length;
+      render(`
+        <div class="title">Pick up where you left off?</div>
+        <p class="lede">You'd answered ${answered} question${answered===1?'':'s'}.</p>
+        <div class="card">
+          <h2>Your answers are still here</h2>
+          <p class="narr">They're saved on this device only — nothing has been sent
+            anywhere and nothing is tied to your name or your email address.</p>
+          <div class="nav" style="margin-top:16px">
+            <button class="btn pri" type="button" id="draftGo">Carry on</button>
+            <button class="btn" type="button" id="draftNew">Start again</button>
+          </div>
+        </div>`);
+      $('#draftGo').onclick = () => {
+        STAGE = 1; screen = Math.min(draft.screen || 0, screensFor(1).length - 1);
+        startedAt = Date.now(); logEvent('resume'); drawScreen();
+      };
+      $('#draftNew').onclick = () => {
+        clearDraft();
+        Object.keys(answers).forEach(k => { if (k !== '__source') delete answers[k]; });
+        STAGE = 1; screen = 0; startedAt = Date.now(); drawScreen();
+      };
+      window.scrollTo({ top: 0 });
+    }
 
     function drawResume(){
       const done = PROGRESS.stages_completed || [];
@@ -158,8 +217,8 @@
       render(`
         <div class="title">Welcome back</div>
         <p class="lede">${next
-          ? `You finished ${done.length} of ${STAGE_MAX} sections.`
-          : `You've finished all ${STAGE_MAX} sections.`}</p>
+          ? `You finished ${done.length} of ${stageCount()} sections.`
+          : `You've finished all ${stageCount()} sections.`}</p>
         <div class="card">
           <h2>${next ? 'Carry on from &ldquo;' + nextTitle + '&rdquo;?' : 'Everything is saved'}</h2>
           <p class="narr">Your answers are saved on this device. Nothing is tied to your
@@ -185,8 +244,9 @@
         // Stage 1's comparison comes back from submit_response, which will return
         // duplicate:true and the same payload as the first time.
         const payload = {};
-        (DEF.questions || []).filter(q => q.type !== 'terminator').forEach(q => {
-          if (answers[q.key] !== undefined) payload[q.key] = answers[q.key]; });
+        ((stageDef(1) || {}).questions || DEF.questions || [])
+          .filter(q => q.type !== 'terminator').forEach(q => {
+            if (answers[q.key] !== undefined) payload[q.key] = answers[q.key]; });
         payload.base_salary_currency = answers.base_salary_currency || 'USD';
         const r = await rpc('submit_response', {
           p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(), p_answers: payload,
@@ -218,12 +278,15 @@
        questions a screen — stage 7 has twelve, and twelve at once after six
        sections is where people close the tab. */
     function screensFor(stage){
-      if (stage === 1){
-        const nums = [...new Set(DEF.questions.filter(q => q.type !== 'terminator')
-          .map(q => q.screen))].sort();
-        return nums.map(n => DEF.questions.filter(q => q.screen === n && q.type !== 'terminator'));
-      }
       const qs = (stageDef(stage) || {}).questions || [];
+      // Section 1 carries explicit screen numbers, because its order is the whole
+      // point of the design: demographics, then the firmographics, then the pay
+      // questions, and only then the comparison. Chunking it by array position would
+      // put the payoff back where it was.
+      if (qs.length && qs.some(q => q.screen != null)){
+        const nums = [...new Set(qs.map(q => q.screen))].sort((a,b) => a - b);
+        return nums.map(n => qs.filter(q => q.screen === n));
+      }
       const out = [];
       for (let i = 0; i < qs.length; i += 6) out.push(qs.slice(i, i + 6));
       return out;
@@ -307,13 +370,20 @@
       return m[answers.country] || 'USD';
     }
 
+    /* DEF.title and DEF.subtitle are the rollback copy for the old widget and still
+       describe the compensation-only survey. The staged widget uses its own. */
+    function introCopy(){
+      const c = (DEF.stages || []).length ? (DEF.stage_flow_copy || {}) : {};
+      return { title: c.title || DEF.title, subtitle: c.subtitle || DEF.subtitle };
+    }
+
     function stageBar(){
       if (STAGE === 1 && !(DEF.stages || []).length) return '';
       const sd = stageDef(STAGE) || {};
       let pips = '';
-      for (let i = 1; i <= STAGE_MAX; i++)
+      for (let i = 1; i <= stageCount(); i++)
         pips += `<i class="${i < STAGE ? 'done' : i === STAGE ? 'now' : ''}"></i>`;
-      return `<div class="stagebar"><span>Section ${STAGE} of ${STAGE_MAX}</span>
+      return `<div class="stagebar"><span>Section ${STAGE} of ${stageCount()}</span>
         <span class="pips">${pips}</span></div>`;
     }
 
@@ -326,7 +396,8 @@
       const sd = stageDef(STAGE) || {};
       const veryFirst = STAGE === 1 && first;
       render(`
-        ${veryFirst ? `<h1>${DEF.title}</h1><p class="lede">${DEF.subtitle}</p>` : ''}
+        ${veryFirst ? `<h1>${introCopy().title}</h1>
+           <p class="lede">${introCopy().subtitle}</p>` : ''}
         ${STAGE > 1 && first ? `<div class="title">${sd.title}</div>
            <p class="lede">${sd.subtitle || ''}</p>` : ''}
         ${stageBar()}
@@ -348,8 +419,12 @@
     }
 
     function wire(){
+      // Save on every answer, not just on Continue. Saving only at the screen
+      // boundary loses whatever was answered on the current screen, which is the
+      // most likely thing to be lost and the most annoying to re-enter.
+      const touch = () => saveDraft();
       app.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
-        answers[b.dataset.q] = b.dataset.v; clearErr(b.dataset.q);
+        answers[b.dataset.q] = b.dataset.v; clearErr(b.dataset.q); touch();
         if (revealsSomething(b.dataset.q)) drawScreen();
         else { app.querySelectorAll(`[data-q="${b.dataset.q}"]`).forEach(x=>{
           x.classList.toggle('sel', x===b); x.setAttribute('aria-pressed', x===b); }); }
@@ -357,27 +432,27 @@
       app.querySelectorAll('[data-qm]').forEach(b => b.onclick = () => {
         const k = b.dataset.qm, set = new Set(answers[k] || []);
         set.has(b.dataset.v) ? set.delete(b.dataset.v) : set.add(b.dataset.v);
-        answers[k] = [...set];
+        answers[k] = [...set]; touch();
         b.classList.toggle('sel'); b.setAttribute('aria-pressed', b.classList.contains('sel'));
       });
       app.querySelectorAll('[data-qs]').forEach(el => el.onchange = () => {
-        answers[el.dataset.qs] = el.value || undefined;
+        answers[el.dataset.qs] = el.value || undefined; touch();
         clearErr(el.dataset.qs);
         if (el.dataset.qs === 'country') answers.base_salary_currency = guessCurrency();
         drawScreen();
       });
       app.querySelectorAll('[data-qn]').forEach(el => el.oninput = () => {
-        answers[el.dataset.qn] = el.value === '' ? undefined : Number(el.value); clearErr(el.dataset.qn); });
+        answers[el.dataset.qn] = el.value === '' ? undefined : Number(el.value); touch(); clearErr(el.dataset.qn); });
       app.querySelectorAll('[data-qc]').forEach(el => el.oninput = () => {
-        answers[el.dataset.qc] = el.value === '' ? undefined : Number(el.value); clearErr(el.dataset.qc);
+        answers[el.dataset.qc] = el.value === '' ? undefined : Number(el.value); touch(); clearErr(el.dataset.qc);
         const z = app.querySelector(`[data-qz="${el.dataset.qc}"]`); if (z) z.checked = false; });
       app.querySelectorAll('[data-qz]').forEach(el => el.onchange = () => {
         const k = el.dataset.qz;
-        answers[k] = el.checked ? 0 : undefined;
+        answers[k] = el.checked ? 0 : undefined; touch();
         const i = app.querySelector(`[data-qc="${k}"]`); if (i) i.value = el.checked ? 0 : '';
         clearErr(k); });
       app.querySelectorAll('[data-qt]').forEach(el => el.oninput = () => {
-        answers[el.dataset.qt] = el.value || undefined; clearErr(el.dataset.qt); });
+        answers[el.dataset.qt] = el.value || undefined; touch(); clearErr(el.dataset.qt); });
       const cur = app.querySelector('[data-cur]');
       if (cur) cur.onchange = () => { answers.base_salary_currency = cur.value;
         app.querySelectorAll('[data-curecho]').forEach(e => e.textContent = cur.value); };
@@ -444,7 +519,7 @@
       }
       if (!ok) return app.querySelector('.err.on')?.scrollIntoView({ block:'center', behavior:'smooth' });
       qs.forEach(q => { if (answers[q.key] !== undefined) logEvent('question_answer', { p_question: q.key }); });
-      if (screen < screensFor(STAGE).length - 1){ screen++; return drawScreen(); }
+      if (screen < screensFor(STAGE).length - 1){ screen++; saveDraft(); return drawScreen(); }
       logEvent('stage_complete');
       if (STAGE === 1) return submit();
       submitStage();
@@ -457,8 +532,14 @@
       const btn = $('#next');
       btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Working out your comparison…';
       const payload = {};
-      DEF.questions.filter(q => q.type !== 'terminator').forEach(q => {
-        if (answers[q.key] !== undefined) payload[q.key] = answers[q.key];
+      // Section 1 now carries the firmographics too, so the payload is built from
+      // the stage, not from the legacy DEF.questions list — which still holds the
+      // old thirteen and is only there so an older widget.js can be rolled back to.
+      ((stageDef(1) || {}).questions || DEF.questions || []).forEach(q => {
+        if (q.type === 'terminator') return;
+        const shown = !q.show_if ||
+          Object.entries(q.show_if).every(([k,v]) => answers[k] === v);
+        if (shown && answers[q.key] !== undefined) payload[q.key] = answers[q.key];
       });
       payload.base_salary_currency = answers.base_salary_currency || 'USD';
       try {
@@ -473,6 +554,7 @@
           p_ip: null                      // set server-side by a proxy if you add one
         });
         if (!r || r.ok === false) return submitFailed(r);
+        clearDraft();          // the server has it now; the device copy is redundant
         RESULT = r;
         activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
           ? 'by_level' : 'by_economy';
@@ -630,7 +712,7 @@
       const res = cuts[activeCut] || cuts.by_level || cuts.by_economy || {};
       const alt = activeCut === 'by_level' ? 'by_economy' : 'by_level';
       const sd = stageDef(STAGE) || {};
-      const last = STAGE === STAGE_MAX;
+      const last = STAGE === stageCount();
       const cutOk = k => cuts[k] && cuts[k].hero && cuts[k].hero.available !== false;
 
       render(`
