@@ -98,7 +98,42 @@
        interim comparison in the same round trip as the write.
      * ===================================================================== */
     let STAGE = 1, STAGE_RESULT = null, FINAL = null, PROGRESS = null;
-    const stageCount = () => ((DEF.stages || []).length || 1);
+    let MODULE = 'full';
+
+    /* A module is a named list of sections over the same definition — core + pay,
+       core + AI, core + team. Chosen with data-module on the embed. Same widget,
+       same database, same response row: the core is answered once per person, ever,
+       so a second module is an update to their existing row rather than a new one. */
+    function moduleDef(){
+      const m = (DEF.modules || {})[MODULE];
+      if (m) return m;
+      const full = (DEF.modules || {}).full;
+      return full || { sections: (DEF.stages || []).map(x => x.n), title: DEF.title,
+                       subtitle: DEF.subtitle };
+    }
+    const sections   = () => moduleDef().sections || [];
+    const sectionIx  = () => sections().indexOf(STAGE);
+    const nextSection = () => sections()[sectionIx() + 1];
+    const isLastSection = () => sectionIx() === sections().length - 1;
+    /* Core and pay share a display group, so the full survey still reads as one
+       opening section followed by five — which is what the respondent experiences,
+       since nothing is shown between them. */
+    function stageCount(){
+      const seen = {};
+      sections().forEach(n => { const st = stageDef(n) || {};
+        seen[st.display_group != null ? 'g' + st.display_group : 's' + n] = 1; });
+      return Object.keys(seen).length || 1;
+    }
+    function stagePos(){
+      const seen = [];
+      for (const n of sections()){
+        const st = stageDef(n) || {};
+        const k = st.display_group != null ? 'g' + st.display_group : 's' + n;
+        if (seen.indexOf(k) < 0) seen.push(k);
+        if (n === STAGE) return seen.length;
+      }
+      return 1;
+    }
     const stageDef = n => (DEF.stages || []).find(x => x.n === n) || null;
 
     /* Section 1 is now seventeen questions and writes nothing to the server until
@@ -156,6 +191,12 @@
       SCREENS = [...new Set(DEF.questions.filter(q => q.type !== 'terminator').map(q => q.screen))].sort();
       const p = new URLSearchParams(location.search);
       answers.__source = mount.dataset.src || p.get('src') || p.get('utm_source') || 'organic';
+      // `mount` only exists in the embedded build; the standalone HTML falls back
+      // to the query string, which is also how you preview a module before publishing.
+      MODULE = (typeof mount !== 'undefined' && mount.dataset.module)
+               || p.get('module') || 'full';
+      if (!(DEF.modules || {})[MODULE]) MODULE = 'full';
+      STAGE = sections()[0];
       startedAt = Date.now();
 
       // Stop and resume. The device token already exists for dedup, so this costs
@@ -169,7 +210,16 @@
       if (PROGRESS && PROGRESS.found && (PROGRESS.stages_completed || []).length){
         clearDraft();
         Object.assign(answers, PROGRESS.answers || {});
-        return drawResume();
+        const done = PROGRESS.stages_completed || [];
+        const todo = sections().filter(n => done.indexOf(n) < 0);
+        // Someone who did the AI module and has come back for pay should not be
+        // asked the core again — that is the entire point of one row per person.
+        if (todo.length && done.indexOf(1) >= 0 && todo.indexOf(1) < 0){
+          STAGE = todo[0]; screen = 0; startedAt = Date.now();
+          logEvent('resume');
+          return drawScreen();
+        }
+        return drawResume(todo);
       }
       const draft = readDraft();
       if (draft){
@@ -208,9 +258,9 @@
       window.scrollTo({ top: 0 });
     }
 
-    function drawResume(){
+    function drawResume(todo){
       const done = PROGRESS.stages_completed || [];
-      const next = PROGRESS.next_stage;
+      const next = (todo && todo[0]) || null;
       const r = (DEF.resume && DEF.resume.copy) || {};
       const nextTitle = next ? (stageDef(next) || {}).title : null;
       logEvent('resume');
@@ -230,8 +280,11 @@
         </div>`);
       const go = $('#resumeGo');
       if (go) go.onclick = () => { STAGE = next; screen = 0; startedAt = Date.now(); drawScreen(); };
-      $('#resumeResults').onclick = () => replayStage(
-        Math.max.apply(null, done.concat([1])));
+      $('#resumeResults').onclick = () => {
+        // The last section they finished that actually shows something.
+        const shown = done.filter(n => ((stageDef(n) || {}).results || {}).mode !== 'none');
+        replayStage(shown.length ? Math.max.apply(null, shown) : 2);
+      };
     }
 
     /* Re-runs the last completed stage's submit to get its comparison back. The
@@ -240,24 +293,8 @@
     async function replayStage(n){
       render(`<div class="card" style="text-align:center;color:var(--muted)">Loading…</div>`);
       STAGE = n;
-      if (n === 1){
-        // Stage 1's comparison comes back from submit_response, which will return
-        // duplicate:true and the same payload as the first time.
-        const payload = {};
-        ((stageDef(1) || {}).questions || DEF.questions || [])
-          .filter(q => q.type !== 'terminator').forEach(q => {
-            if (answers[q.key] !== undefined) payload[q.key] = answers[q.key]; });
-        payload.base_salary_currency = answers.base_salary_currency || 'USD';
-        const r = await rpc('submit_response', {
-          p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(), p_answers: payload,
-          p_source: answers.__source, p_referrer: null, p_duration_ms: 999999,
-          p_honeypot: null, p_ip: null });
-        if (!r || r.ok === false) return submitFailed(r);
-        RESULT = r;
-        activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
-          ? 'by_level' : 'by_economy';
-        return drawResults();
-      }
+      const st = stageDef(n) || {};
+      const isPay = (st.results || {}).mode === 'full';
       const payload = {};
       (stageDef(n).questions || []).forEach(q => {
         if (answers[q.key] !== undefined) payload[q.key] = answers[q.key]; });
@@ -265,6 +302,12 @@
         p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
         p_stage: n, p_answers: payload, p_duration_ms: 999999 });
       if (!r || r.ok === false) return submitFailed(r);
+      if (isPay){
+        RESULT = r;
+        activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
+          ? 'by_level' : 'by_economy';
+        return drawResults();
+      }
       STAGE_RESULT = r; FINAL = r.final || null;
       drawStageResults();
     }
@@ -373,17 +416,19 @@
     /* DEF.title and DEF.subtitle are the rollback copy for the old widget and still
        describe the compensation-only survey. The staged widget uses its own. */
     function introCopy(){
-      const c = (DEF.stages || []).length ? (DEF.stage_flow_copy || {}) : {};
-      return { title: c.title || DEF.title, subtitle: c.subtitle || DEF.subtitle };
+      if (!(DEF.stages || []).length) return { title: DEF.title, subtitle: DEF.subtitle };
+      const m = moduleDef();
+      return { title: m.title || DEF.title, subtitle: m.subtitle || DEF.subtitle };
     }
 
     function stageBar(){
       if (STAGE === 1 && !(DEF.stages || []).length) return '';
       const sd = stageDef(STAGE) || {};
       let pips = '';
+      const pos = stagePos();
       for (let i = 1; i <= stageCount(); i++)
-        pips += `<i class="${i < STAGE ? 'done' : i === STAGE ? 'now' : ''}"></i>`;
-      return `<div class="stagebar"><span>Section ${STAGE} of ${stageCount()}</span>
+        pips += `<i class="${i < pos ? 'done' : i === pos ? 'now' : ''}"></i>`;
+      return `<div class="stagebar"><span>Section ${stagePos()} of ${stageCount()}</span>
         <span class="pips">${pips}</span></div>`;
     }
 
@@ -394,11 +439,11 @@
       const scr = screensFor(STAGE), qs = questionsFor(screen);
       const first = screen === 0, last = screen === scr.length - 1;
       const sd = stageDef(STAGE) || {};
-      const veryFirst = STAGE === 1 && first;
+      const veryFirst = STAGE === sections()[0] && first;
       render(`
         ${veryFirst ? `<h1>${introCopy().title}</h1>
            <p class="lede">${introCopy().subtitle}</p>` : ''}
-        ${STAGE > 1 && first ? `<div class="title">${sd.title}</div>
+        ${!veryFirst && first ? `<div class="title">${sd.title}</div>
            <p class="lede">${sd.subtitle || ''}</p>` : ''}
         ${stageBar()}
         <div class="prog" role="progressbar" aria-valuenow="${screen+1}" aria-valuemax="${scr.length}">
@@ -410,7 +455,7 @@
           <button class="btn pri" type="button" id="next">
             ${last ? (STAGE === 1 ? 'See my comparison' : 'See how I compare') : 'Continue'}</button>
         </div>
-        ${STAGE > 1 ? `<p class="consent">${(DEF.resume && DEF.resume.copy &&
+        ${!veryFirst ? `<p class="consent">${(DEF.resume && DEF.resume.copy &&
             DEF.resume.copy.on_leave) || 'Saved on this device — you can come back any time.'}</p>` : ''}
         ${veryFirst?`<p class="consent">${DEF.consent_text}</p>`:''}`);
       wire();
@@ -521,14 +566,59 @@
       qs.forEach(q => { if (answers[q.key] !== undefined) logEvent('question_answer', { p_question: q.key }); });
       if (screen < screensFor(STAGE).length - 1){ screen++; saveDraft(); return drawScreen(); }
       logEvent('stage_complete');
-      if (STAGE === 1) return submit();
-      submitStage();
+      submitSection();
+    }
+
+    /* One place that decides how a finished section is written and what comes back:
+         core  -> submit_core, no results, straight on
+         pay   -> submit_stage, the full compensation screen
+         rest  -> submit_stage, hero and up to two cards                        */
+    function submitSection(){
+      const st = stageDef(STAGE) || {};
+      const mode = (st.results || {}).mode;
+      if (st.is_core) return submitCore();
+      return submitStage(mode === 'full');
     }
 
     /* =====================================================================
        submit
        ===================================================================== */
-    async function submit(){
+    async function submitCore(){
+      const btn = $('#next');
+      btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Saving…';
+      const payload = {};
+      ((stageDef(1) || {}).questions || []).forEach(q => {
+        const shown = !q.show_if ||
+          Object.entries(q.show_if).every(([k,v]) => answers[k] === v);
+        if (shown && answers[q.key] !== undefined) payload[q.key] = answers[q.key];
+      });
+      try {
+        const r = await rpc('submit_core', {
+          p_survey_slug: CONFIG.slug,
+          p_anon_token: deviceToken(),
+          p_answers: payload,
+          p_source: answers.__source,
+          p_module: MODULE,
+          p_referrer: document.referrer || null,
+          p_duration_ms: Date.now() - startedAt,
+          p_honeypot: ($('#hp') && $('#hp').value) || null,
+          p_ip: null
+        });
+        if (!r || r.ok === false) return submitFailed(r);
+        clearDraft();                       // the server has the core now
+        // No results screen here, by design. In every module the payoff is one
+        // section away, and stopping to say "here is your tenure" would spend
+        // attention on the least interesting thing we know about them.
+        const nx = nextSection();
+        if (!nx) return drawStopped();
+        STAGE = nx; screen = 0; startedAt = Date.now();
+        drawScreen();
+      } catch (e){ submitFailed({ error: 'network', message: e.message }); }
+    }
+
+    /* The old all-in-one submit_response path. Nothing calls it in the module flow;
+       it stays so the legacy entry point is still exercised and can be reverted to. */
+    async function submitLegacy(){
       const btn = $('#next');
       btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Working out your comparison…';
       const payload = {};
@@ -587,7 +677,7 @@
     /* =====================================================================
        stages 2-7: submit and interim comparison
        ===================================================================== */
-    async function submitStage(){
+    async function submitStage(isPay){
       const btn = $('#next');
       btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Comparing…';
       const payload = {};
@@ -602,6 +692,14 @@
           p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
           p_stage: STAGE, p_answers: payload, p_duration_ms: Date.now() - startedAt });
         if (!r || r.ok === false) return submitFailed(r);
+        if (isPay){
+          // Same payload shape submit_response returned, so the tested compensation
+          // screen renders it without knowing anything changed.
+          RESULT = r;
+          activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
+            ? 'by_level' : 'by_economy';
+          return drawResults();
+        }
         STAGE_RESULT = r; FINAL = r.final || null;
         drawStageResults();
       } catch (e){ submitFailed({ error: 'network', message: e.message }); }
@@ -712,11 +810,12 @@
       const res = cuts[activeCut] || cuts.by_level || cuts.by_economy || {};
       const alt = activeCut === 'by_level' ? 'by_economy' : 'by_level';
       const sd = stageDef(STAGE) || {};
-      const last = STAGE === stageCount();
+      const last = isLastSection();
+      const isFull = MODULE === 'full';
       const cutOk = k => cuts[k] && cuts[k].hero && cuts[k].hero.available !== false;
 
       render(`
-        <div class="title">${last ? "Here's the whole picture" : sd.title}</div>
+        <div class="title">${last && isFull ? "Here's the whole picture" : sd.title}</div>
         ${stageBar()}
         <div class="seg" role="group">
           ${(DEF.display_cuts||[]).map(c => `<button data-scut="${c.key}"
@@ -724,10 +823,10 @@
         </div>
         ${styleCard(res.hero, true)}
         ${(res.cards || []).map(c => styleCard(c, false)).join('')}
-        ${last ? finalHTML() : ''}
+        ${last && isFull ? finalHTML() : ''}
+        ${last ? (isFull ? '' : crossSellHTML()) : continueHTML()}
         ${last ? unlockHTML(null) : ''}
         ${last ? asksHTML() : ''}
-        ${last ? '' : continueHTML()}
         <p class="foot" id="sfoot"></p>`);
 
       if ($('#foot')) $('#foot').innerHTML = '';
@@ -740,16 +839,16 @@
       const go = $('#stageGo');
       if (go) go.onclick = () => {
         logEvent('continue_click');
-        STAGE++; screen = 0; startedAt = Date.now(); drawScreen(); };
+        STAGE = nextSection(); screen = 0; startedAt = Date.now(); drawScreen(); };
       const stop = $('#stageStop');
       if (stop) stop.onclick = () => { logEvent('leave_click'); drawStopped(); };
-      if (last) wireResults();
+      wireResults();
       logEvent('results_view');
       window.scrollTo({ top: 0 });
     }
 
     function continueHTML(){
-      const next = stageDef(STAGE + 1) || {};
+      const next = stageDef(nextSection()) || {};
       return `<div class="card">
         <h2>Next: ${next.title || ''}</h2>
         <p class="narr">${next.subtitle || ''} About
@@ -993,15 +1092,44 @@
        the landing page makes. The reason to continue is the cross-stage cards at the
        end, which are genuinely impossible from the pay questions alone. */
     function continuePromptHTML(){
-      const sd = stageDef(1) || {};
-      const cp = sd.continue_prompt;
-      if (!cp || !(DEF.stages || []).length) return '';
+      const nx = nextSection();
+      if (!nx) return crossSellHTML();      // end of a short module
+      const cp = (stageDef(STAGE) || {}).continue_prompt;
+      const nd = stageDef(nx) || {};
+      const left = sections().length - sectionIx() - 1;
       return `<div class="card" style="border-image:var(--brand-grad) 1;border-image-slice:1;border-width:0 0 0 3px">
-        <h2>${cp.headline}</h2>
-        <p class="narr">${cp.body}</p>
+        <h2>${cp ? cp.headline : 'Next: ' + (nd.title || '')}</h2>
+        <p class="narr">${cp ? cp.body : (nd.subtitle || '')}</p>
         <div class="nav" style="margin-top:14px">
-          <button class="btn pri" type="button" id="s1go">${cp.cta}</button>
+          <button class="btn pri" type="button" id="s1go">${cp ? cp.cta : 'Keep going'}</button>
+          ${left > 1 ? '' : `<button class="btn" type="button" id="s1stop">No thanks</button>`}
         </div></div>`;
+    }
+
+    /* End of a short module. The warmest audience this tool ever has is someone who
+       has just been given a comparison, and the next module costs them only its own
+       questions because the core is already answered. */
+    function crossSellHTML(){
+      const mods = DEF.modules || {};
+      const done = (STAGE_RESULT && STAGE_RESULT.stages_completed)
+                || (PROGRESS && PROGRESS.stages_completed) || sections();
+      const offers = Object.keys(mods)
+        .filter(k => k !== MODULE && k !== 'full')
+        .map(k => ({ key: k, m: mods[k], topic: (mods[k].sections || [])[1] }))
+        .filter(o => o.topic && done.indexOf(o.topic) < 0)
+        .slice(0, 2);
+      if (!offers.length) return '';
+      return `<div class="card" style="border-image:var(--brand-grad) 1;border-image-slice:1;border-width:0 0 0 3px">
+        <h2>One more comparison?</h2>
+        <p class="narr">You've already answered the questions about you, so these are
+          shorter — just the topic itself.</p>
+        ${offers.map(o => `<button class="btn" type="button" data-mod="${o.key}"
+            style="width:100%;text-align:left;margin-top:9px">
+            <b>${o.m.title}</b><br>
+            <span style="font-size:13px;font-weight:400;color:var(--ink-2)">${
+              ((stageDef(o.topic) || {}).questions || []).length} questions · ${o.m.promise || ''}</span>
+          </button>`).join('')}
+      </div>`;
     }
 
     function unlockHTML(otherCut){
@@ -1040,9 +1168,24 @@
     function wireResults(){
       const s1 = $('#s1go');
       if (s1) s1.onclick = () => {
+        const nx = nextSection();
+        if (!nx) return;
         logEvent('continue_click');
-        STAGE = 2; screen = 0; startedAt = Date.now(); drawScreen();
+        STAGE = nx; screen = 0; startedAt = Date.now(); drawScreen();
       };
+      const s1s = $('#s1stop');
+      if (s1s) s1s.onclick = () => { logEvent('leave_click'); drawStopped(); };
+      app.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => {
+        // Switching module in place: same page, same row, straight into the topic.
+        MODULE = b.dataset.mod;
+        const done = (STAGE_RESULT && STAGE_RESULT.stages_completed)
+                  || (RESULT && RESULT.stages_completed) || [1];
+        const todo = sections().filter(n => done.indexOf(n) < 0);
+        STAGE = todo.length ? todo[0] : sections()[sections().length - 1];
+        screen = 0; startedAt = Date.now();
+        logEvent('continue_click');
+        drawScreen();
+      });
       app.querySelectorAll('[data-cut]').forEach(b => b.onclick = () => {
         activeCut = b.dataset.cut; drawResults(); window.scrollTo({top:0,behavior:'smooth'}); });
       app.querySelectorAll('[data-tip]').forEach(el => {
@@ -1060,12 +1203,43 @@
           e.textContent = 'Please enter a valid email address.'; e.classList.add('on'); return;
         }
         send.disabled = true; send.innerHTML = '<span class="spin"></span> Sending…';
-        const ok = await sendToHubSpot(email, $('#askPanel').checked);
+        const panel = $('#askPanel').checked;
+
+        // The database first, HubSpot second. Before this the only place the address
+        // went was a HubSpot post that isn't configured yet, so the screen said
+        // "we've recorded your request" while recording nothing. Blockers stop
+        // api.hsforms.com often enough that this would still be the right order once
+        // HubSpot is wired up.
+        let rec = null;
+        try {
+          rec = await rpc('record_report_request', {
+            p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
+            p_email: email, p_panel_opt_in: panel, p_source: answers.__source });
+        } catch (e) { rec = null; }
+
+        if (!rec || rec.ok === false){
+          const e = app.querySelector('[data-err="email"]');
+          e.textContent = rec && rec.error === 'bad_email'
+            ? "That address doesn't look right — could you check it?"
+            : rec && rec.error === 'rate_limited'
+              ? "We already have that request. Nothing else to do."
+              : 'We could not save that just now. Please try again in a moment.';
+          e.classList.add('on');
+          send.disabled = false; send.innerHTML = 'Send me the report';
+          return;
+        }
+
+        const ok = await sendToHubSpot(email, panel);
+        try {
+          rpc('mark_report_request_delivered', {
+            p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
+            p_delivered: !!ok }).catch(()=>{});
+        } catch (e) {}
+
         const done = $('#askDone');
         done.style.display = 'block';
-        done.innerHTML = ok
-          ? `<b>Done.</b> We'll email the report to ${email} when it publishes.`
-          : `<b>Noted.</b> We've recorded your request for ${email}.`;
+        // True whether or not HubSpot took it, because the database has it either way.
+        done.innerHTML = `<b>Done.</b> We'll email the report to ${email} when it publishes.`;
         send.style.display = 'none';
       };
     }
