@@ -9,10 +9,21 @@
    its CSS cannot leak out. Optional attributes on the mount div:
        data-src="newsletter"    source tag for this placement
        data-theme="light|dark"  force a theme (default: follows the OS)
+       data-module="pay"        which module to run (default: full)
+       data-survey="slug"       which survey to load (default: csc-compensation-2026)
+       data-hide-title          hide the survey title (when the page has its own)
+
+   Report request: put HubSpot's form embed code directly below the widget,
+   inside this container. The widget keeps it hidden while someone is answering
+   and reveals it when they reach their results:
+       <div data-csc-report hidden> …HubSpot embed code… </div>
+   The email address goes to HubSpot only. It never reaches the survey database.
+
+   Requires 16_fixes.sql.
    ===================================================================== */
 (function () {
   'use strict';
-  var CSS = ":host{display:block;all:initial;font:16px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:light dark;}\n:host *{box-sizing:border-box}\n\n:host{\n  /* ---------------------------------------------------------------------\n     CSC brand palette, validated with the dataviz palette checker.\n     Accent must carry a data mark, so it needs >=3:1 against the surface it\n     sits on and a real separation from the de-emphasis gray:\n       light  #5036d5  contrast 7.4:1 on white, CVD dE 23.0 protan\n       dark   #6251ef  brand violet stepped to L 0.549 (inside the 0.48-0.67\n                       dark band), contrast >=3:1, CVD dE 22.5 protan\n     Rejected: #ff4dd8 sits at L 0.714, outside the dark band, and white text\n     on it is only 2.87:1. #00aeed / #56dedb / #f68af9 are all under 3:1 on the\n     light surface. They are used decoratively below, never for data.\n     --------------------------------------------------------------------- */\n  --plane:#f9f8f5; --surface-1:#ffffff;\n  --ink:#09100f; --ink-2:#4a5150; --muted:#7c8280;\n  --grid:#e6e4df; --axis:#c9c6bf; --border:rgba(9,16,15,0.10);\n  --accent:#5036d5; --accent-ink:#ffffff; --context:#7c8280;\n  --track:#e6e4df; --box:#c9c6bf; --bad:#d03b3b;\n  --brand-pink:#ff4dd8; --brand-teal:#56dedb; --brand-blue:#00aeed;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#5036d5 100%);\n}\n@media (prefers-color-scheme:dark){:host(:not([data-theme=light])){\n  --plane:#09100f; --surface-1:#121a19;\n  --ink:#f9f8f5; --ink-2:#c2c7c5; --muted:#868c8a;\n  --grid:#1e2423; --axis:#2c3332; --border:rgba(249,248,245,0.12);\n  --accent:#6251ef; --accent-ink:#ffffff; --context:#868c8a;\n  --track:#1e2423; --box:#2c3332; --bad:#e66767;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#6f62ff 100%);\n}}\n:host([data-theme=dark]){\n  --plane:#09100f; --surface-1:#121a19;\n  --ink:#f9f8f5; --ink-2:#c2c7c5; --muted:#868c8a;\n  --grid:#1e2423; --axis:#2c3332; --border:rgba(249,248,245,0.12);\n  --accent:#6251ef; --accent-ink:#ffffff; --context:#868c8a;\n  --track:#1e2423; --box:#2c3332; --bad:#e66767;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#6f62ff 100%);\n}\n*{box-sizing:border-box}\n.root{margin:0;background:var(--plane);color:var(--ink);\n font:16px/1.55 'Poppins','Poppins Fallback',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}\n.wrap{max-width:560px;margin:0 auto;padding:16px 16px 64px}\n.brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}\n.brand b{font-size:12px;letter-spacing:.08em;font-weight:600}\n.brand .dot{display:inline-block;width:9px;height:9px;border-radius:50%;\n background-image:var(--brand-grad);margin-right:7px}\n.tt{background:transparent;border:1px solid var(--border);color:var(--ink-2);border-radius:7px;\n font:inherit;font-size:12px;padding:5px 9px;cursor:pointer}\n.title{font-size:24px;font-weight:700;line-height:1.22;margin:0 0 8px;letter-spacing:-.015em}\n.lede{color:var(--ink-2);font-size:15px;margin:0 0 20px}\n.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;\n padding:18px 16px;margin-bottom:12px}\n.prog{display:flex;gap:5px;margin-bottom:18px}\n.prog i{flex:1;height:4px;border-radius:2px;background:var(--track);transition:background .2s}\n.prog i.on{background-image:var(--brand-grad)}\n.q{margin-bottom:26px}\n.q:last-child{margin-bottom:8px}\nlabel.qlab{display:block;font-size:16px;font-weight:600;margin-bottom:4px;line-height:1.35}\n.help{font-size:13px;color:var(--muted);margin-bottom:10px}\n.opts{display:grid;gap:7px}\n.opt{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:9px;\n padding:11px 12px;cursor:pointer;background:transparent;font:inherit;text-align:left;\n color:var(--ink);width:100%;line-height:1.35}\n.opt:hover{border-color:var(--accent)}\n.opt[aria-pressed=true],.opt.sel{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 8%,transparent)}\n.opt .tick{flex:0 0 18px;height:18px;border:1.5px solid var(--axis);border-radius:50%;margin-top:1px}\n.opt.multi .tick{border-radius:5px}\n.opt.sel .tick{border-color:var(--accent);background:var(--accent);\n box-shadow:inset 0 0 0 3px var(--surface-1)}\ninput[type=text],input[type=number],input[type=email],select{\n width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:9px;\n background:var(--surface-1);color:var(--ink)}\ninput:focus,select:focus,.opt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}\n.money{display:grid;grid-template-columns:112px 1fr;gap:8px}\n.zero{margin-top:9px;font-size:13.5px;color:var(--ink-2);display:flex;gap:8px;align-items:center;cursor:pointer}\n.err{color:var(--bad);font-size:13px;margin-top:7px;display:none}\n.err.on{display:block}\n.nav{display:flex;gap:8px;margin-top:6px}\n.btn{flex:1;font:inherit;font-size:15px;font-weight:600;padding:14px;border-radius:10px;cursor:pointer;\n border:1px solid var(--border);background:transparent;color:var(--ink)}\n.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:transparent}\n.btn:disabled{opacity:.5;cursor:default}\n.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}\n.consent{font-size:12.5px;color:var(--muted);margin-top:16px;line-height:1.55}\n\n/* ---------- results ---------- */\n.hero{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;\n padding:22px 18px;margin-bottom:12px;border-top:3px solid transparent;\n border-image:var(--brand-grad) 1;border-image-slice:1;border-width:3px 0 0 0}\n.hero .fig{font-size:54px;line-height:1;font-weight:700;letter-spacing:-.02em;color:var(--accent)}\n.hero .sub{color:var(--ink-2);font-size:15px;margin-top:9px}\n.hero .sub b{color:var(--ink)}\n.hero .fx{color:var(--muted);font-size:12.5px;margin-top:11px;padding-top:11px;border-top:1px solid var(--border)}\n.seg{display:flex;gap:5px;margin-bottom:12px}\n.seg button{flex:1;font:inherit;font-size:13px;padding:10px;border-radius:8px;cursor:pointer;\n border:1px solid var(--border);background:var(--surface-1);color:var(--ink-2)}\n.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}\n.seg button:disabled{opacity:.45;cursor:not-allowed}\n.note{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;\n padding:12px 13px;margin-bottom:12px;font-size:13px;color:var(--ink-2)}\n.note b{color:var(--ink)}\n.card h2{font-size:14px;margin:0 0 3px}\n.card .basis-mini{font-size:11.5px;color:var(--muted);margin:0 0 14px}\n.narr{font-size:14px;color:var(--ink-2);margin:14px 0 0}\n.narr b{color:var(--ink);font-weight:600}\nsvg{display:block;width:100%;overflow:visible}\ntext{font:11px 'Poppins','Poppins Fallback',system-ui,-apple-system,'Segoe UI',sans-serif;fill:var(--muted)}\ntext.you{fill:var(--accent);font-weight:700;font-size:12px}\ntext.val{fill:var(--ink-2);font-variant-numeric:tabular-nums}\n.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}\n.kpis.two{grid-template-columns:repeat(2,1fr)}\n.kpi{border:1px solid var(--border);border-radius:9px;padding:12px 9px;text-align:center}\n.kpi .v{font-size:26px;font-weight:700;line-height:1.1}\n.kpi .k{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.3}\n.kpi .mine{font-size:10.5px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);color:var(--ink-2)}\n.gap-row{display:grid;grid-template-columns:1fr 46px;gap:10px;align-items:center;padding:8px 0}\n.gap-row+.gap-row{border-top:1px solid var(--border)}\n.bar{height:7px;background:var(--track);border-radius:4px;overflow:hidden;margin-top:5px}\n.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}\n.gap-pct{text-align:right;font-size:13px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}\ndetails{margin-top:13px;border-top:1px solid var(--border);padding-top:10px}\nsummary{font-size:12px;color:var(--muted);cursor:pointer}\ntable{width:100%;border-collapse:collapse;margin-top:9px;font-size:12.5px}\nth,td{text-align:left;padding:5px 0;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}\nth{color:var(--muted);font-weight:600}\n.foot{color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.6}\n.tipbox{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--ink);\n color:var(--plane);padding:6px 9px;border-radius:6px;font-size:12px;z-index:99;white-space:nowrap}\n.spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.35);\n border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}\n@keyframes sp{to{transform:rotate(360deg)}}\n.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}\n\n/* ---------- stage flow ---------- */\n.stagebar{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--muted)}\n.stagebar .pips{display:flex;gap:4px;flex:1}\n.stagebar .pips i{flex:1;height:4px;border-radius:2px;background:var(--track)}\n.stagebar .pips i.done{background:var(--context)}\n.stagebar .pips i.now{background-image:var(--brand-grad)}\n.hero.mini .fig{font-size:40px}\n.hero.mini .sub{font-size:14px}\n.dbar{display:grid;grid-template-columns:1fr 42px;gap:10px;align-items:center;padding:7px 0}\n.dbar+.dbar{border-top:1px solid var(--border)}\n.dbar .lab{font-size:13.5px;line-height:1.3}\n.dbar.you .lab{font-weight:600;color:var(--ink)}\n.dbar .bar i{background:var(--context)}\n.dbar.you .bar i{background:var(--accent)}\n.dbar .pc{text-align:right;font-size:13px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}\n.dbar.you .pc{color:var(--accent)}\n.youtag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;\n color:var(--accent-ink);background:var(--accent);border-radius:4px;padding:1px 5px;margin-left:6px;\n vertical-align:1px}\n.twob{display:grid;gap:10px;margin-top:4px}\n.twob .row .lab{font-size:13.5px;margin-bottom:4px}\n.twob .row.you .lab{font-weight:600;color:var(--ink)}\n.twob .row .bar{height:22px;border-radius:6px}\n.twob .row .bar i{background:var(--context);border-radius:6px}\n.twob .row.you .bar i{background:var(--accent)}\n.twob .row .v{font-size:12.5px;color:var(--ink-2);margin-top:4px;font-variant-numeric:tabular-nums}\n.qtr{position:relative;height:34px;margin:10px 0 4px}\n.qtr .track{position:absolute;top:14px;left:0;right:0;height:6px;background:var(--track);border-radius:3px}\n.qtr .box{position:absolute;top:11px;height:12px;background:var(--box);border-radius:3px}\n.qtr .med{position:absolute;top:7px;width:2px;height:20px;background:var(--ink-2)}\n.qtr .me{position:absolute;top:4px;width:3px;height:26px;background:var(--accent);border-radius:2px}\n.qtr .melab{position:absolute;top:-2px;font-size:11px;font-weight:700;color:var(--accent);transform:translateX(-50%)}\n.sup{background:var(--surface-1);border:1px dashed var(--border);border-radius:10px;\n padding:14px 13px;margin-bottom:12px;font-size:13.5px;color:var(--ink-2)}\n";
+  var CSS = ":host{all:initial;display:block;font:16px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:light dark;}\n:host *{box-sizing:border-box}\n\n:host{\n  /* ---------------------------------------------------------------------\n     CSC brand palette, validated with the dataviz palette checker.\n     Accent must carry a data mark, so it needs >=3:1 against the surface it\n     sits on and a real separation from the de-emphasis gray:\n       light  #5036d5  contrast 7.4:1 on white, CVD dE 23.0 protan\n       dark   #6251ef  brand violet stepped to L 0.549 (inside the 0.48-0.67\n                       dark band), contrast >=3:1, CVD dE 22.5 protan\n     Rejected: #ff4dd8 sits at L 0.714, outside the dark band, and white text\n     on it is only 2.87:1. #00aeed / #56dedb / #f68af9 are all under 3:1 on the\n     light surface. They are used decoratively below, never for data.\n     --------------------------------------------------------------------- */\n  --plane:#f9f8f5; --surface-1:#ffffff;\n  --ink:#09100f; --ink-2:#4a5150; --muted:#7c8280;\n  --grid:#e6e4df; --axis:#c9c6bf; --border:rgba(9,16,15,0.10);\n  --accent:#5036d5; --accent-ink:#ffffff; --context:#7c8280;\n  --track:#e6e4df; --box:#c9c6bf; --bad:#d03b3b;\n  --brand-pink:#ff4dd8; --brand-teal:#56dedb; --brand-blue:#00aeed;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#5036d5 100%);\n}\n@media (prefers-color-scheme:dark){:host(:not([data-theme=light])){\n  --plane:#09100f; --surface-1:#121a19;\n  --ink:#f9f8f5; --ink-2:#c2c7c5; --muted:#868c8a;\n  --grid:#1e2423; --axis:#2c3332; --border:rgba(249,248,245,0.12);\n  --accent:#6251ef; --accent-ink:#ffffff; --context:#868c8a;\n  --track:#1e2423; --box:#2c3332; --bad:#e66767;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#6f62ff 100%);\n}}\n:host([data-theme=dark]){\n  --plane:#09100f; --surface-1:#121a19;\n  --ink:#f9f8f5; --ink-2:#c2c7c5; --muted:#868c8a;\n  --grid:#1e2423; --axis:#2c3332; --border:rgba(249,248,245,0.12);\n  --accent:#6251ef; --accent-ink:#ffffff; --context:#868c8a;\n  --track:#1e2423; --box:#2c3332; --bad:#e66767;\n  --brand-grad:linear-gradient(90deg,#ff4dd8 0%,#6f62ff 100%);\n}\n*{box-sizing:border-box}\n.root{margin:0;background:var(--plane);color:var(--ink);\n font:16px/1.55 'Poppins','Poppins Fallback',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}\n.wrap{max-width:560px;margin:0 auto;padding:16px 16px 64px}\n.brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}\n.brand b{font-size:12px;letter-spacing:.08em;font-weight:600}\n.brand .dot{display:inline-block;width:9px;height:9px;border-radius:50%;\n background-image:var(--brand-grad);margin-right:7px}\n.tt{background:transparent;border:1px solid var(--border);color:var(--ink-2);border-radius:7px;\n font:inherit;font-size:12px;padding:5px 9px;cursor:pointer}\n.title{font-size:24px;font-weight:700;line-height:1.22;margin:0 0 8px;letter-spacing:-.015em}\n.lede{color:var(--ink-2);font-size:15px;margin:0 0 20px}\n.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;\n padding:18px 16px;margin-bottom:12px}\n.prog{display:flex;gap:5px;margin-bottom:18px}\n.prog i{flex:1;height:4px;border-radius:2px;background:var(--track);transition:background .2s}\n.prog i.on{background-image:var(--brand-grad)}\n.q{margin-bottom:26px}\n.q:last-child{margin-bottom:8px}\nlabel.qlab{display:block;font-size:16px;font-weight:600;margin-bottom:4px;line-height:1.35}\n.help{font-size:13px;color:var(--muted);margin-bottom:10px}\n.opts{display:grid;gap:7px}\n.opt{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:9px;\n padding:11px 12px;cursor:pointer;background:transparent;font:inherit;text-align:left;\n color:var(--ink);width:100%;line-height:1.35}\n.opt:hover{border-color:var(--accent)}\n.opt[aria-pressed=true],.opt.sel{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 8%,transparent)}\n.opt .tick{flex:0 0 18px;height:18px;border:1.5px solid var(--axis);border-radius:50%;margin-top:1px}\n.opt.multi .tick{border-radius:5px}\n.opt.sel .tick{border-color:var(--accent);background:var(--accent);\n box-shadow:inset 0 0 0 3px var(--surface-1)}\ninput[type=text],input[type=number],input[type=email],select{\n width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:9px;\n background:var(--surface-1);color:var(--ink)}\ninput:focus,select:focus,.opt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}\n.money{display:grid;grid-template-columns:112px 1fr;gap:8px}\n.zero{margin-top:9px;font-size:13.5px;color:var(--ink-2);display:flex;gap:8px;align-items:center;cursor:pointer}\n.err{color:var(--bad);font-size:13px;margin-top:7px;display:none}\n.err.on{display:block}\n.nav{display:flex;gap:8px;margin-top:6px}\n.btn{flex:1;font:inherit;font-size:15px;font-weight:600;padding:14px;border-radius:10px;cursor:pointer;\n border:1px solid var(--border);background:transparent;color:var(--ink)}\n.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:transparent}\n.btn:disabled{opacity:.5;cursor:default}\n.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}\n.consent{font-size:12.5px;color:var(--muted);margin-top:16px;line-height:1.55}\n\n/* ---------- results ---------- */\n.hero{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;\n padding:22px 18px;margin-bottom:12px;border-top:3px solid transparent;\n border-image:var(--brand-grad) 1;border-image-slice:1;border-width:3px 0 0 0}\n.hero .fig{font-size:54px;line-height:1;font-weight:700;letter-spacing:-.02em;color:var(--accent)}\n.hero .sub{color:var(--ink-2);font-size:15px;margin-top:9px}\n.hero .sub b{color:var(--ink)}\n.hero .fx{color:var(--muted);font-size:12.5px;margin-top:11px;padding-top:11px;border-top:1px solid var(--border)}\n.seg{display:flex;gap:5px;margin-bottom:12px}\n.seg button{flex:1;font:inherit;font-size:13px;padding:10px;border-radius:8px;cursor:pointer;\n border:1px solid var(--border);background:var(--surface-1);color:var(--ink-2)}\n.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}\n.seg button:disabled{opacity:.45;cursor:not-allowed}\n.note{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;\n padding:12px 13px;margin-bottom:12px;font-size:13px;color:var(--ink-2)}\n.note b{color:var(--ink)}\n.card h2{font-size:14px;margin:0 0 3px}\n.card .basis-mini{font-size:11.5px;color:var(--muted);margin:0 0 14px}\n.narr{font-size:14px;color:var(--ink-2);margin:14px 0 0}\n.narr b{color:var(--ink);font-weight:600}\nsvg{display:block;width:100%;overflow:visible}\ntext{font:11px 'Poppins','Poppins Fallback',system-ui,-apple-system,'Segoe UI',sans-serif;fill:var(--muted)}\ntext.you{fill:var(--accent);font-weight:700;font-size:12px}\ntext.val{fill:var(--ink-2);font-variant-numeric:tabular-nums}\n.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}\n.kpis.two{grid-template-columns:repeat(2,1fr)}\n.kpi{border:1px solid var(--border);border-radius:9px;padding:12px 9px;text-align:center}\n.kpi .v{font-size:26px;font-weight:700;line-height:1.1}\n.kpi .k{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.3}\n.kpi .mine{font-size:10.5px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);color:var(--ink-2)}\n.gap-row{display:grid;grid-template-columns:1fr 46px;gap:10px;align-items:center;padding:8px 0}\n.gap-row+.gap-row{border-top:1px solid var(--border)}\n.bar{height:7px;background:var(--track);border-radius:4px;overflow:hidden;margin-top:5px}\n.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}\n.gap-pct{text-align:right;font-size:13px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}\ndetails{margin-top:13px;border-top:1px solid var(--border);padding-top:10px}\nsummary{font-size:12px;color:var(--muted);cursor:pointer}\ntable{width:100%;border-collapse:collapse;margin-top:9px;font-size:12.5px}\nth,td{text-align:left;padding:5px 0;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}\nth{color:var(--muted);font-weight:600}\n.foot{color:var(--muted);font-size:11.5px;margin-top:18px;line-height:1.6}\n.tipbox{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--ink);\n color:var(--plane);padding:6px 9px;border-radius:6px;font-size:12px;z-index:99;white-space:nowrap}\n.spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.35);\n border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}\n@keyframes sp{to{transform:rotate(360deg)}}\n.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}\n\n/* ---------- stage flow ---------- */\n.stagebar{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--muted)}\n.stagebar .pips{display:flex;gap:4px;flex:1}\n.stagebar .pips i{flex:1;height:4px;border-radius:2px;background:var(--track)}\n.stagebar .pips i.done{background:var(--context)}\n.stagebar .pips i.now{background-image:var(--brand-grad)}\n.hero.mini .fig{font-size:40px}\n.hero.mini .sub{font-size:14px}\n.dbar{display:grid;grid-template-columns:1fr 42px;gap:10px;align-items:center;padding:7px 0}\n.dbar+.dbar{border-top:1px solid var(--border)}\n.dbar .lab{font-size:13.5px;line-height:1.3}\n.dbar.you .lab{font-weight:600;color:var(--ink)}\n.dbar .bar i{background:var(--context)}\n.dbar.you .bar i{background:var(--accent)}\n.dbar .pc{text-align:right;font-size:13px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}\n.dbar.you .pc{color:var(--accent)}\n.youtag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;\n color:var(--accent-ink);background:var(--accent);border-radius:4px;padding:1px 5px;margin-left:6px;\n vertical-align:1px}\n.twob{display:grid;gap:10px;margin-top:4px}\n.twob .row .lab{font-size:13.5px;margin-bottom:4px}\n.twob .row.you .lab{font-weight:600;color:var(--ink)}\n.twob .row .bar{height:22px;border-radius:6px}\n.twob .row .bar i{background:var(--context);border-radius:6px}\n.twob .row.you .bar i{background:var(--accent)}\n.twob .row .v{font-size:12.5px;color:var(--ink-2);margin-top:4px;font-variant-numeric:tabular-nums}\n.qtr{position:relative;height:34px;margin:10px 0 4px}\n.qtr .track{position:absolute;top:14px;left:0;right:0;height:6px;background:var(--track);border-radius:3px}\n.qtr .box{position:absolute;top:11px;height:12px;background:var(--box);border-radius:3px}\n.qtr .med{position:absolute;top:7px;width:2px;height:20px;background:var(--ink-2)}\n.qtr .me{position:absolute;top:4px;width:3px;height:26px;background:var(--accent);border-radius:2px}\n.qtr .melab{position:absolute;top:-2px;font-size:11px;font-weight:700;color:var(--accent);transform:translateX(-50%)}\n.sup{background:var(--surface-1);border:1px dashed var(--border);border-radius:10px;\n padding:14px 13px;margin-bottom:12px;font-size:13.5px;color:var(--ink-2)}\n";
   var SHELL_HTML = '<div class="root"><div id="app" aria-live="polite"></div>' +
                    '<div class="foot" id="foot"></div><div class="tipbox" id="tip" role="status"></div></div>';
 
@@ -32,22 +43,33 @@
     const CONFIG = {
       url:  'https://spnbwiqpkitezdqofzmn.supabase.co',
       key:  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwbmJ3aXFwa2l0ZXpkcW9mem1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MzU2ODAsImV4cCI6MjEwMjExMTY4MH0.g2w_xFLdG2O8ltoAR8MS1d0JfUYYyGGtGwHYO7LDGWQ',
-      slug: 'csc-compensation-2026',
-      // HubSpot: fill these in and the report request starts posting to your form.
-      // Until then the button records the opt-in locally and tells the user we'll
-      // be in touch, rather than silently failing.
-      hubspot: { portalId: null, formGuid: null }
+      slug: mount.dataset.survey || 'csc-compensation-2026',
+      // HubSpot's shareable link to the same report form. Shown as a fallback for
+      // anyone whose ad blocker stops the embedded form loading. null = no link.
+      reportFormUrl: 'https://share-eu1.hsforms.com/1VvhElB6vQ5iwrrGTKQP3lg2b1vun'
     };
     /* ===================================================================== */
 
     const $ = s => root.querySelector(s);
     const app = $('#app'), tip = $('#tip');
-    const money = (v, c) => (c && c !== 'USD' ? '' : '$') + Math.round(v).toLocaleString('en-US') + (c && c !== 'USD' ? ' ' + c : '');
     const usd = v => '$' + Math.round(v).toLocaleString('en-US');
     const ord = n => n + (['th','st','nd','rd'][n % 100 >> 3 ^ 1 && n % 10] || 'th');
+    // Anything typed by a person or returned as an error goes through this before
+    // it touches innerHTML. Copy from the survey definition is trusted and may
+    // contain entities on purpose, so it is not escaped.
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+      c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     // basis labels appear mid-sentence: "among Individual contributors" reads wrong
     const midSentence = s => !s ? s
       : (s.split(' ')[0] === s.split(' ')[0].toUpperCase() ? s : s[0].toLowerCase() + s.slice(1));
+    // Scroll to the top of the widget, not the top of the page. Only scrolls up,
+    // and only when the widget's top is out of view: on a long article the reader
+    // stays where they are.
+    function toTop(smooth){
+      const top = mount.getBoundingClientRect().top;
+      if (top < 0) window.scrollTo({ top: window.scrollY + top - 16,
+                                     behavior: smooth ? 'smooth' : 'auto' });
+    }
 
     /* ---- device token: cookie first, then localStorage, then session only ---- */
     function deviceToken(){
@@ -87,15 +109,17 @@
        definition, or the economy tier comes out wrong. ---- */
     const COUNTRIES = ["United States","United Kingdom","Canada","Australia","New Zealand","Ireland","Germany","France","Netherlands","Belgium","Spain","Portugal","Italy","Austria","Switzerland","Sweden","Denmark","Norway","Finland","Iceland","Luxembourg","Greece","Malta","Cyprus","Czechia","Slovakia","Slovenia","Estonia","Latvia","Lithuania","Croatia","Poland","Hungary","Romania","Bulgaria","Serbia","Macedonia","Bosnia and Herzegovina","Albania","Ukraine","Turkey","Israel","United Arab Emirates","Saudi Arabia","Qatar","Egypt","Morocco","Algeria","Tunisia","Nigeria","Kenya","Ghana","South Africa","India","Pakistan","Bangladesh","Sri Lanka","Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","China","Hong Kong","Taiwan","Japan","South Korea","Brazil","Mexico","Argentina","Chile","Colombia","Peru","Uruguay","Costa Rica","Panama","Guatemala","Trinidad & Tobago","Jamaica","Armenia","Georgia","Kazakhstan","Russia","Other"];
 
-    let DEF = null, Q = {}, SCREENS = [], screen = 0, answers = {}, startedAt = Date.now();
+    let DEF = null, Q = {}, screen = 0, answers = {}, startedAt = Date.now();
     let RESULT = null, activeCut = 'by_level';
+    let lastView = null;                  // stage:screen last logged as viewed
 
     /* ===================================================================== *
        STAGE_FLOW
-       Stage 1 is the compensation module and is untouched: same screens, same
-       submit_response call, same results screen. Stages 2-7 come from
-       DEF.stages[] and go through submit_stage, which returns that stage's
-       interim comparison in the same round trip as the write.
+       Section 1 is the core (demographics and firmographics), written by
+       submit_core with no results screen. Every later section goes through
+       submit_stage, which writes and returns that section's comparison in one
+       round trip. The pay section (results.mode = 'full') returns the full
+       compensation payload; the rest return a hero and up to two cards.
      * ===================================================================== */
     let STAGE = 1, STAGE_RESULT = null, FINAL = null, PROGRESS = null;
     let MODULE = 'full';
@@ -136,11 +160,10 @@
     }
     const stageDef = n => (DEF.stages || []).find(x => x.n === n) || null;
 
-    /* Section 1 is now seventeen questions and writes nothing to the server until
-       the last of them, so a reload halfway through would throw all of it away. The
-       draft is kept on the device only — same place the anonymous token already
-       lives, no new identity, nothing sent anywhere — and is cleared the moment the
-       server has the answers. */
+    /* Section 1 writes nothing to the server until its last question, so a reload
+       halfway through would throw all of it away. The draft is kept on the device
+       only — same place the anonymous token already lives, nothing sent anywhere —
+       and is cleared the moment the server has the answers. */
     const DRAFT_KEY = 'csc_bm_draft';
     function saveDraft(){
       try {
@@ -174,34 +197,28 @@
     /* =====================================================================
        boot
        ===================================================================== */
-    (async function boot(){
+    (async function init(){
       render(`<div class="card" style="text-align:center;color:var(--muted)">Loading…</div>`);
       try {
         DEF = await rpc('get_survey', { p_slug: CONFIG.slug });
         if (!DEF) throw new Error('survey not open');
       } catch (e) {
         return render(`<div class="card"><h2>We can't load the survey right now</h2>
-          <p class="narr">${e.message}. Please try again shortly.</p></div>`);
+          <p class="narr">${esc(e.message)}. Please try again shortly.</p></div>`);
       }
-      DEF.questions.filter(q => q.type !== 'terminator').forEach(q => Q[q.key] = q);
-      // Q must cover every stage, not just stage 1: wire() looks options up by key
-      // to decide whether an answer reveals another question, and a missing entry
-      // throws on the first click of stage 2.
+      (DEF.questions || []).filter(q => q.type !== 'terminator').forEach(q => Q[q.key] = q);
+      // Q must cover every stage: wire() looks options up by key to decide
+      // whether an answer reveals another question.
       (DEF.stages || []).forEach(st => (st.questions || []).forEach(q => Q[q.key] = q));
-      SCREENS = [...new Set(DEF.questions.filter(q => q.type !== 'terminator').map(q => q.screen))].sort();
       const p = new URLSearchParams(location.search);
       answers.__source = mount.dataset.src || p.get('src') || p.get('utm_source') || 'organic';
-      // `mount` only exists in the embedded build; the standalone HTML falls back
-      // to the query string, which is also how you preview a module before publishing.
-      MODULE = (typeof mount !== 'undefined' && mount.dataset.module)
-               || p.get('module') || 'full';
+      MODULE = mount.dataset.module || p.get('module') || 'full';
       if (!(DEF.modules || {})[MODULE]) MODULE = 'full';
       STAGE = sections()[0];
       startedAt = Date.now();
 
-      // Stop and resume. The device token already exists for dedup, so this costs
-      // no new identity and no email address. If the visitor has never started,
-      // get_progress returns {found:false} and we fall through to the survey.
+      // Stop and resume. If the visitor has never started, get_progress returns
+      // {found:false} and we fall through to the survey.
       try {
         PROGRESS = await rpc('get_progress',
           { p_survey_slug: CONFIG.slug, p_anon_token: deviceToken() });
@@ -239,7 +256,7 @@
         <p class="lede">You'd answered ${answered} question${answered===1?'':'s'}.</p>
         <div class="card">
           <h2>Your answers are still here</h2>
-          <p class="narr">They're saved on this device only — nothing has been sent
+          <p class="narr">They're saved in this browser only — nothing has been sent
             anywhere and nothing is tied to your name or your email address.</p>
           <div class="nav" style="margin-top:16px">
             <button class="btn pri" type="button" id="draftGo">Carry on</button>
@@ -255,13 +272,12 @@
         Object.keys(answers).forEach(k => { if (k !== '__source') delete answers[k]; });
         STAGE = 1; screen = 0; startedAt = Date.now(); drawScreen();
       };
-      window.scrollTo({ top: 0 });
+      toTop();
     }
 
     function drawResume(todo){
       const done = PROGRESS.stages_completed || [];
       const next = (todo && todo[0]) || null;
-      const r = (DEF.resume && DEF.resume.copy) || {};
       const nextTitle = next ? (stageDef(next) || {}).title : null;
       logEvent('resume');
       render(`
@@ -271,8 +287,8 @@
           : `You've finished all ${stageCount()} sections.`}</p>
         <div class="card">
           <h2>${next ? 'Carry on from &ldquo;' + nextTitle + '&rdquo;?' : 'Everything is saved'}</h2>
-          <p class="narr">Your answers are saved on this device. Nothing is tied to your
-            name or your email address.</p>
+          <p class="narr">Your answers are saved against an anonymous ID kept in this
+            browser. Nothing is tied to your name.</p>
           <div class="nav" style="margin-top:16px">
             ${next ? `<button class="btn pri" type="button" id="resumeGo">Carry on</button>` : ''}
             <button class="btn" type="button" id="resumeResults">Show me my results</button>
@@ -287,22 +303,21 @@
       };
     }
 
-    /* Re-runs the last completed stage's submit to get its comparison back. The
-       upsert makes that idempotent — it rewrites the same answers to the same
-       response row — so "show me my results" costs one round trip and no data. */
+    /* Read-only. get_results rebuilds the comparison from what is stored and writes
+       nothing, so looking at your results can never change your answers. */
     async function replayStage(n){
       render(`<div class="card" style="text-align:center;color:var(--muted)">Loading…</div>`);
       STAGE = n;
-      const st = stageDef(n) || {};
-      const isPay = (st.results || {}).mode === 'full';
-      const payload = {};
-      (stageDef(n).questions || []).forEach(q => {
-        if (answers[q.key] !== undefined) payload[q.key] = answers[q.key]; });
-      const r = await rpc('submit_stage', {
-        p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
-        p_stage: n, p_answers: payload, p_duration_ms: 999999 });
-      if (!r || r.ok === false) return submitFailed(r);
-      if (isPay){
+      let r = null;
+      try {
+        r = await rpc('get_results', {
+          p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(), p_stage: n });
+      } catch (e) { r = { ok: false, message: e.message }; }
+      if (!r || r.ok === false){
+        return render(`<div class="card"><h2>We couldn't load your results</h2>
+          <p class="narr">${esc((r && r.message) || 'Please try again shortly.')}</p></div>`);
+      }
+      if (r.cuts){
         RESULT = r;
         activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
           ? 'by_level' : 'by_economy';
@@ -317,15 +332,10 @@
     /* =====================================================================
        survey screens
        ===================================================================== */
-    /* Stage 1 keeps its authored screen numbers. Stages 2-7 are chunked at six
-       questions a screen — stage 7 has twelve, and twelve at once after six
-       sections is where people close the tab. */
+    /* Sections that carry explicit screen numbers keep them. The rest are chunked
+       at six questions a screen. */
     function screensFor(stage){
       const qs = (stageDef(stage) || {}).questions || [];
-      // Section 1 carries explicit screen numbers, because its order is the whole
-      // point of the design: demographics, then the firmographics, then the pay
-      // questions, and only then the comparison. Chunking it by array position would
-      // put the payoff back where it was.
       if (qs.length && qs.some(q => q.screen != null)){
         const nums = [...new Set(qs.map(q => q.screen))].sort((a,b) => a - b);
         return nums.map(n => qs.filter(q => q.screen === n));
@@ -359,14 +369,16 @@
         inner = list
           ? `<select data-qs="${q.key}"><option value="">Select…</option>` +
             list.map(c => `<option${v===c?' selected':''}>${c}</option>`).join('') + `</select>`
-          // no list defined for this question (industry): free text, same as the
-          // annual survey collects
-          : `<input type="text" data-qt="${q.key}" maxlength="80" value="${v??''}" placeholder="e.g. SaaS">`;
+          // no list defined for this question (industry): free text
+          : `<input type="text" data-qt="${q.key}" maxlength="80" value="${esc(v)}" placeholder="e.g. SaaS">`;
       } else if (q.type === 'number'){
         inner = `<input type="number" inputmode="numeric" data-qn="${q.key}" min="${q.min??0}" max="${q.max??99}"
           value="${v??''}" placeholder="e.g. 6">`;
       } else if (q.type === 'currency'){
-        const cur = answers.base_salary_currency || guessCurrency();
+        // Always hold a currency in answers, so it is saved, validated against and
+        // sent. Before this it only existed if the respondent touched the select.
+        if (!answers.base_salary_currency) answers.base_salary_currency = guessCurrency();
+        const cur = answers.base_salary_currency;
         const list = Object.keys((DEF.fx_rates && DEF.fx_rates.per_usd) || {USD:1}).sort();
         const isBase = q.key === 'base_salary';
         inner = `<div class="money">
@@ -377,7 +389,7 @@
         if (q.allow_zero) inner += `<label class="zero"><input type="checkbox" data-qz="${q.key}"
           ${v===0?'checked':''}> ${q.zero_label}</label>`;
       } else if (q.type === 'text'){
-        inner = `<input type="text" data-qt="${q.key}" maxlength="${q.max_length||80}" value="${v??''}">`;
+        inner = `<input type="text" data-qt="${q.key}" maxlength="${q.max_length||80}" value="${esc(v)}">`;
       }
       return `<div class="q" data-qwrap="${q.key}">
         <label class="qlab">${q.label}${q.required===false?' <span style="font-weight:400;color:var(--muted)">(optional)</span>':''}</label>
@@ -394,7 +406,7 @@
     }
 
     // Approximate USD value, for VALIDATION ONLY. The authoritative conversion
-    // happens in submit_response using the same rates from the definition.
+    // happens in submit_stage using the same rates from the definition.
     function toUsdApprox(amount){
       const rates = (DEF.fx_rates && DEF.fx_rates.per_usd) || {};
       const r = rates[answers.base_salary_currency || 'USD'];
@@ -410,11 +422,12 @@
         'Italy':'EUR','Portugal':'EUR','Austria':'EUR','Ireland':'EUR','Finland':'EUR',
         'Greece':'EUR','Croatia':'EUR','Slovenia':'EUR','Slovakia':'EUR','Estonia':'EUR',
         'Latvia':'EUR','Lithuania':'EUR','Luxembourg':'EUR','Malta':'EUR','Cyprus':'EUR' };
-      return m[answers.country] || 'USD';
+      const c = m[answers.country] || 'USD';
+      // Only offer a currency the definition can actually convert.
+      const rates = (DEF && DEF.fx_rates && DEF.fx_rates.per_usd) || {};
+      return rates[c] ? c : 'USD';
     }
 
-    /* DEF.title and DEF.subtitle are the rollback copy for the old widget and still
-       describe the compensation-only survey. The staged widget uses its own. */
     function introCopy(){
       if (!(DEF.stages || []).length) return { title: DEF.title, subtitle: DEF.subtitle };
       const m = moduleDef();
@@ -423,7 +436,6 @@
 
     function stageBar(){
       if (STAGE === 1 && !(DEF.stages || []).length) return '';
-      const sd = stageDef(STAGE) || {};
       let pips = '';
       const pos = stagePos();
       for (let i = 1; i <= stageCount(); i++)
@@ -434,14 +446,16 @@
 
     function drawScreen(){
       // The results footer lives outside #app and persists across renders, so it has
-      // to be cleared by hand or stage 1's vintage line trails every later screen.
+      // to be cleared by hand.
       if ($('#foot')) $('#foot').innerHTML = '';
+      showReportForm(false);
       const scr = screensFor(STAGE), qs = questionsFor(screen);
       const first = screen === 0, last = screen === scr.length - 1;
       const sd = stageDef(STAGE) || {};
       const veryFirst = STAGE === sections()[0] && first;
       render(`
-        ${veryFirst ? `<h1>${introCopy().title}</h1>
+        ${veryFirst ? `${mount.dataset.hideTitle !== undefined ? ''
+             : `<h1 class="title">${introCopy().title}</h1>`}
            <p class="lede">${introCopy().subtitle}</p>` : ''}
         ${!veryFirst && first ? `<div class="title">${sd.title}</div>
            <p class="lede">${sd.subtitle || ''}</p>` : ''}
@@ -456,17 +470,21 @@
             ${last ? (STAGE === 1 ? 'See my comparison' : 'See how I compare') : 'Continue'}</button>
         </div>
         ${!veryFirst ? `<p class="consent">${(DEF.resume && DEF.resume.copy &&
-            DEF.resume.copy.on_leave) || 'Saved on this device — you can come back any time.'}</p>` : ''}
+            DEF.resume.copy.on_leave) || 'Saved as you go — come back in this browser any time.'}</p>` : ''}
         ${veryFirst?`<p class="consent">${DEF.consent_text}</p>`:''}`);
       wire();
-      qs.forEach(q => logEvent('question_view', { p_question: q.key }));
-      window.scrollTo({ top: 0 });
+      // Log a view once per screen. drawScreen also runs when an answer reveals a
+      // follow-up, and logging then would count the same view several times.
+      const vk = STAGE + ':' + screen;
+      if (vk !== lastView){
+        lastView = vk;
+        qs.forEach(q => logEvent('question_view', { p_question: q.key }));
+      }
+      toTop();
     }
 
     function wire(){
-      // Save on every answer, not just on Continue. Saving only at the screen
-      // boundary loses whatever was answered on the current screen, which is the
-      // most likely thing to be lost and the most annoying to re-enter.
+      // Save on every answer, not just on Continue.
       const touch = () => saveDraft();
       app.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
         answers[b.dataset.q] = b.dataset.v; clearErr(b.dataset.q); touch();
@@ -481,9 +499,10 @@
         b.classList.toggle('sel'); b.setAttribute('aria-pressed', b.classList.contains('sel'));
       });
       app.querySelectorAll('[data-qs]').forEach(el => el.onchange = () => {
-        answers[el.dataset.qs] = el.value || undefined; touch();
+        answers[el.dataset.qs] = el.value || undefined;
         clearErr(el.dataset.qs);
         if (el.dataset.qs === 'country') answers.base_salary_currency = guessCurrency();
+        touch();
         drawScreen();
       });
       app.querySelectorAll('[data-qn]').forEach(el => el.oninput = () => {
@@ -499,24 +518,19 @@
       app.querySelectorAll('[data-qt]').forEach(el => el.oninput = () => {
         answers[el.dataset.qt] = el.value || undefined; touch(); clearErr(el.dataset.qt); });
       const cur = app.querySelector('[data-cur]');
-      if (cur) cur.onchange = () => { answers.base_salary_currency = cur.value;
+      if (cur) cur.onchange = () => { answers.base_salary_currency = cur.value; touch();
         app.querySelectorAll('[data-curecho]').forEach(e => e.textContent = cur.value); };
       if ($('#back')) $('#back').onclick = () => { screen--; drawScreen(); };
       $('#next').onclick = onNext;
     }
 
-    /* Module A put `reveals` on the OPTION ('Something else' reveals a text box).
-       The staged questions put it on the QUESTION (courses_taken reveals two
-       follow-ups), so the original check missed them: the follow-ups counted as
-       visible for validation but were never rendered, and Continue then failed with
-       no error anywhere on screen. Rather than depend on where `reveals` was
-       written, ask the only question that matters — does anything in this stage
-       branch on this key. */
+    /* Does anything in this stage branch on this key? `reveals` can sit on the
+       option or on the question, and show_if can name the key directly, so all
+       three are checked. */
     function revealsSomething(key){
       if ((Q[key] && Q[key].options || []).some(o => o.reveals)) return true;
       if (Q[key] && Q[key].reveals) return true;
-      const pool = STAGE === 1 ? (DEF.questions || [])
-                               : ((stageDef(STAGE) || {}).questions || []);
+      const pool = (stageDef(STAGE) || {}).questions || [];
       return pool.some(q => q.show_if && Object.keys(q.show_if).indexOf(key) >= 0);
     }
 
@@ -524,7 +538,7 @@
       if (e){ e.textContent = msg; e.classList.add('on'); return; }
       // No slot for this error means the question is required but not on screen —
       // a branching bug, not a respondent mistake. Say so rather than leaving a
-      // Continue button that does nothing, which is what the reveal bug produced.
+      // Continue button that does nothing.
       let box = app.querySelector('#stuck');
       if (!box){
         box = document.createElement('div');
@@ -580,78 +594,44 @@
       return submitStage(mode === 'full');
     }
 
+    /* Only send questions that were actually shown: a question hidden by its
+       show_if was never asked. */
+    function stagePayload(n){
+      const payload = {};
+      ((stageDef(n) || {}).questions || []).forEach(q => {
+        const shown = !q.show_if ||
+          Object.entries(q.show_if).every(([k,v]) => answers[k] === v);
+        if (shown && answers[q.key] !== undefined) payload[q.key] = answers[q.key];
+      });
+      return payload;
+    }
+
     /* =====================================================================
        submit
        ===================================================================== */
     async function submitCore(){
       const btn = $('#next');
       btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Saving…';
-      const payload = {};
-      ((stageDef(1) || {}).questions || []).forEach(q => {
-        const shown = !q.show_if ||
-          Object.entries(q.show_if).every(([k,v]) => answers[k] === v);
-        if (shown && answers[q.key] !== undefined) payload[q.key] = answers[q.key];
-      });
       try {
         const r = await rpc('submit_core', {
           p_survey_slug: CONFIG.slug,
           p_anon_token: deviceToken(),
-          p_answers: payload,
+          p_answers: stagePayload(1),
           p_source: answers.__source,
           p_module: MODULE,
           p_referrer: document.referrer || null,
           p_duration_ms: Date.now() - startedAt,
-          p_honeypot: ($('#hp') && $('#hp').value) || null,
-          p_ip: null
+          p_honeypot: ($('#hp') && $('#hp').value) || null
+          // p_ip deliberately not sent: the server reads it from the request headers
         });
         if (!r || r.ok === false) return submitFailed(r);
         clearDraft();                       // the server has the core now
-        // No results screen here, by design. In every module the payoff is one
-        // section away, and stopping to say "here is your tenure" would spend
-        // attention on the least interesting thing we know about them.
+        // No results screen here, by design: the payoff is one section away.
         const nx = nextSection();
         if (!nx) return drawStopped();
         STAGE = nx; screen = 0; startedAt = Date.now();
         drawScreen();
       } catch (e){ submitFailed({ error: 'network', message: e.message }); }
-    }
-
-    /* The old all-in-one submit_response path. Nothing calls it in the module flow;
-       it stays so the legacy entry point is still exercised and can be reverted to. */
-    async function submitLegacy(){
-      const btn = $('#next');
-      btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Working out your comparison…';
-      const payload = {};
-      // Section 1 now carries the firmographics too, so the payload is built from
-      // the stage, not from the legacy DEF.questions list — which still holds the
-      // old thirteen and is only there so an older widget.js can be rolled back to.
-      ((stageDef(1) || {}).questions || DEF.questions || []).forEach(q => {
-        if (q.type === 'terminator') return;
-        const shown = !q.show_if ||
-          Object.entries(q.show_if).every(([k,v]) => answers[k] === v);
-        if (shown && answers[q.key] !== undefined) payload[q.key] = answers[q.key];
-      });
-      payload.base_salary_currency = answers.base_salary_currency || 'USD';
-      try {
-        const r = await rpc('submit_response', {
-          p_survey_slug: CONFIG.slug,
-          p_anon_token: deviceToken(),
-          p_answers: payload,
-          p_source: answers.__source,
-          p_referrer: document.referrer || null,
-          p_duration_ms: Date.now() - startedAt,
-          p_honeypot: ($('#hp') && $('#hp').value) || null,
-          p_ip: null                      // set server-side by a proxy if you add one
-        });
-        if (!r || r.ok === false) return submitFailed(r);
-        clearDraft();          // the server has it now; the device copy is redundant
-        RESULT = r;
-        activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
-          ? 'by_level' : 'by_economy';
-        drawResults();
-      } catch (e){
-        submitFailed({ error: 'network', message: e.message });
-      }
     }
 
     function submitFailed(r){
@@ -661,6 +641,7 @@
         too_fast: 'Please take a moment over the questions and try again.',
         invalid_salary: 'That salary figure doesn\'t look right — please check it.',
         unsupported_currency: r && r.message,
+        missing_currency: 'Please choose the currency you are paid in.',
         rate_limited: 'A few too many submissions from your network just now. Please try again later.',
         rejected: 'Something went wrong with that submission.',
         survey_not_open: 'This survey has closed.',
@@ -668,33 +649,31 @@
       };
       const msg = (r && map[r.error]) || (r && r.message) || 'Something went wrong.';
       let box = app.querySelector('#failbox');
-      if (!box){ box = document.createElement('div'); box.id = 'failbox'; box.className = 'note';
-        app.querySelector('.nav').before(box); }
-      box.innerHTML = `<b>${msg}</b>`;
+      if (!box){
+        box = document.createElement('div'); box.id = 'failbox'; box.className = 'note';
+        const nav = app.querySelector('.nav');
+        if (nav) nav.before(box); else app.appendChild(box);
+      }
+      box.innerHTML = `<b>${esc(msg)}</b>`;
       box.scrollIntoView({ block:'center', behavior:'smooth' });
     }
 
     /* =====================================================================
-       stages 2-7: submit and interim comparison
+       sections 2-7: submit and comparison
        ===================================================================== */
     async function submitStage(isPay){
       const btn = $('#next');
       btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Comparing…';
-      const payload = {};
-      (stageDef(STAGE).questions || []).forEach(q => {
-        // A question hidden by its show_if was never asked, so it must not be sent.
-        const shown = !q.show_if ||
-          Object.entries(q.show_if).every(([k,v]) => answers[k] === v);
-        if (shown && answers[q.key] !== undefined) payload[q.key] = answers[q.key];
-      });
+      const payload = stagePayload(STAGE);
+      // The currency is not a question in its own right, so stagePayload never
+      // picks it up. Without this line every non-dollar salary was stored as dollars.
+      if (isPay) payload.base_salary_currency = answers.base_salary_currency || guessCurrency();
       try {
         const r = await rpc('submit_stage', {
           p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
           p_stage: STAGE, p_answers: payload, p_duration_ms: Date.now() - startedAt });
         if (!r || r.ok === false) return submitFailed(r);
         if (isPay){
-          // Same payload shape submit_response returned, so the tested compensation
-          // screen renders it without knowing anything changed.
           RESULT = r;
           activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
             ? 'by_level' : 'by_economy';
@@ -797,9 +776,7 @@
       return '';
     }
 
-    /* Headlines carry {placeholders} that name keys in the payload. The generator
-       validates every one of them against the style's contract, so a missing value
-       here means the payload changed and the build check was skipped. */
+    /* Headlines carry {placeholders} that name keys in the payload. */
     function fillHeadline(c){
       const h = c.headline || '';
       return h.replace(/\{(\w+)\}/g, (m, k) => c[k] != null ? c[k] : '');
@@ -808,7 +785,6 @@
     function drawStageResults(){
       const cuts = STAGE_RESULT.results || {};
       const res = cuts[activeCut] || cuts.by_level || cuts.by_economy || {};
-      const alt = activeCut === 'by_level' ? 'by_economy' : 'by_level';
       const sd = stageDef(STAGE) || {};
       const last = isLastSection();
       const isFull = MODULE === 'full';
@@ -835,7 +811,7 @@
         or attributed. Sections you've finished: ${(STAGE_RESULT.stages_completed||[]).join(', ')}.`;
 
       app.querySelectorAll('[data-scut]').forEach(b => b.onclick = () => {
-        activeCut = b.dataset.scut; drawStageResults(); window.scrollTo({top:0,behavior:'smooth'}); });
+        activeCut = b.dataset.scut; drawStageResults(); toTop(true); });
       const go = $('#stageGo');
       if (go) go.onclick = () => {
         logEvent('continue_click');
@@ -844,7 +820,7 @@
       if (stop) stop.onclick = () => { logEvent('leave_click'); drawStopped(); };
       wireResults();
       logEvent('results_view');
-      window.scrollTo({ top: 0 });
+      toTop();
     }
 
     function continueHTML(){
@@ -865,22 +841,19 @@
       render(`<div class="title">Saved</div>
         <div class="card">
           <h2>You can pick this up any time</h2>
-          <p class="narr">Your answers are saved on this device. Come back to this page and
-            you'll carry on from where you stopped. Nothing is tied to your name or your
-            email address.</p>
+          <p class="narr">Your answers are saved against an anonymous ID kept in this
+            browser. Come back to this page in the same browser and you'll carry on from
+            where you stopped. Nothing is tied to your name.</p>
         </div>
         ${unlockHTML(null)}
         ${asksHTML()}`);
       wireResults();
-      window.scrollTo({ top: 0 });
+      toTop();
     }
 
     /* ---- the cross-stage cards ---------------------------------------------- */
-    /* No cut toggle on these, deliberately. Within the IC band, peers who took a
-       course earn 20% more; pooled across everyone the same card reads 8% less,
-       because execs earn most and take fewest courses. Letting someone flip a
-       toggle and watch the answer change sign would cost more trust than a
-       suppressed card does. */
+    /* No cut toggle on these, deliberately: the same card can change sign between
+       the within-level and pooled views. */
     function finalHTML(){
       const cards = FINAL || [];
       if (!cards.length) return '';
@@ -906,7 +879,7 @@
     }
 
     /* =====================================================================
-       results
+       compensation results
        ===================================================================== */
     function benefitLabel(key){
       const q = Q.benefits;
@@ -992,7 +965,7 @@
       }
 
       const diff = Math.round((you.base_salary_usd / st.median - 1) * 100);
-      const shownKeys = new Set(visibleOptions(Q.benefits).map(o => o.key));
+      const shownKeys = new Set(Q.benefits ? visibleOptions(Q.benefits).map(o => o.key) : []);
       const gaps = (cut.benefits_gap || []).filter(g => shownKeys.has(g.key)).slice(0, 5);
       const fxLine = you.entered_currency && you.entered_currency !== 'USD'
         ? `<div class="fx">You entered ${you.entered_currency}. Converted at ${you.fx_rate} to
@@ -1013,7 +986,7 @@
         ${(DEF.display_cuts||[]).map(c=>{
           const avail = RESULT.cuts[c.key] && RESULT.cuts[c.key].available && !RESULT.cuts[c.key].unclassified;
           return `<button type="button" data-cut="${c.key}" aria-pressed="${c.key===activeCut}"
-            ${avail?'':'disabled title="'+((RESULT.cuts[c.key]||{}).message||'Not available for you')+'"'}>
+            ${avail?'':'disabled title="'+esc((RESULT.cuts[c.key]||{}).message||'Not available for you')+'"'}>
             ${c.toggle_label}</button>`;}).join('')}
       </div>
 
@@ -1084,13 +1057,11 @@
         ${RESULT.threshold} responses. Individual answers are never published or attributed.
         Figures normalised to US dollars.`;
       wireResults();
+      toTop();
     }
 
-    /* The offer to carry on, shown under the full stage 1 results and never above
-       them. Stage 1's six cards are all still there: weakening the one screen that
-       converts, in order to manufacture a reason to continue, would break the promise
-       the landing page makes. The reason to continue is the cross-stage cards at the
-       end, which are genuinely impossible from the pay questions alone. */
+    /* The offer to carry on, shown under the full pay results and never above
+       them. */
     function continuePromptHTML(){
       const nx = nextSection();
       if (!nx) return crossSellHTML();      // end of a short module
@@ -1106,13 +1077,17 @@
         </div></div>`;
     }
 
-    /* End of a short module. The warmest audience this tool ever has is someone who
-       has just been given a comparison, and the next module costs them only its own
-       questions because the core is already answered. */
+    function completedStages(){
+      return (STAGE_RESULT && STAGE_RESULT.stages_completed)
+          || (RESULT && RESULT.stages_completed)
+          || (PROGRESS && PROGRESS.stages_completed) || sections();
+    }
+
+    /* End of a short module: offer the others. They're shorter now, because the
+       core is already answered. */
     function crossSellHTML(){
       const mods = DEF.modules || {};
-      const done = (STAGE_RESULT && STAGE_RESULT.stages_completed)
-                || (PROGRESS && PROGRESS.stages_completed) || sections();
+      const done = completedStages();
       const offers = Object.keys(mods)
         .filter(k => k !== MODULE && k !== 'full')
         .map(k => ({ key: k, m: mods[k], topic: (mods[k].sections || [])[1] }))
@@ -1146,26 +1121,39 @@
       </div>`;
     }
 
+    /* The report form lives on the host page, outside the shadow root, because
+       HubSpot's embed renders into the page and cannot reach inside the widget.
+       Keeping it outside is also the point: the email never touches this code. */
+    const reportForm = () => document.querySelector('[data-csc-report]');
+    function showReportForm(on){ const f = reportForm(); if (f) f.hidden = !on; }
+
     function asksHTML(){
-      const asks = (DEF.post_results_asks && DEF.post_results_asks.asks) || [];
-      const report = asks.find(a => a.key === 'report_request') || {};
-      const panel  = asks.find(a => a.key === 'panel_opt_in') || {};
+      const form = reportForm(), url = CONFIG.reportFormUrl;
+      if (!form && !url){
+        console.warn('[CSC] No report form: add <div data-csc-report hidden> to the page, or set reportFormUrl.');
+        return '';
+      }
       return `<div class="card" id="asks">
-        <h2>${report.copy || 'Send me the full report'}</h2>
-        <p class="basis-mini" style="margin-bottom:12px">Optional. Your answers stay anonymous either way —
-          this is a separate permission.</p>
-        <div class="q" style="margin-bottom:14px">
-          <input type="email" id="askEmail" placeholder="you@company.com" autocomplete="email">
-          <div class="err" data-err="email"></div>
+        <h2>Get the full report</h2>
+        <p class="narr">${form ? 'Use the form below' : 'Use the link below'} to request a copy
+          when it publishes. It's separate from the survey: your answers stay anonymous
+          whether or not you fill it in.</p>
+        <div class="nav" style="margin-top:14px">
+          ${form ? `<button class="btn pri" type="button" id="toReport">Go to the form</button>` : ''}
+          ${url ? `<a class="btn${form ? '' : ' pri'}" href="${esc(url)}" target="_blank" rel="noopener"
+              style="text-align:center;text-decoration:none">${form ? 'Open it in a new tab' : 'Request the report'}</a>` : ''}
         </div>
-        <label class="zero" style="margin-bottom:14px"><input type="checkbox" id="askPanel">
-          ${panel.copy || 'Send me the next module when it opens'}</label>
-        <button class="btn pri" type="button" id="askSend">Send me the report</button>
-        <div id="askDone" class="note" style="display:none;margin:12px 0 0"></div>
       </div>`;
     }
 
     function wireResults(){
+      showReportForm(!!$('#asks'));
+      const toReport = $('#toReport');
+      // Deliberately not logged: a click time could be matched to HubSpot's
+      // submission time and re-link an email to a set of answers.
+      if (toReport) toReport.onclick = () => {
+        reportForm().scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
       const s1 = $('#s1go');
       if (s1) s1.onclick = () => {
         const nx = nextSection();
@@ -1178,8 +1166,7 @@
       app.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => {
         // Switching module in place: same page, same row, straight into the topic.
         MODULE = b.dataset.mod;
-        const done = (STAGE_RESULT && STAGE_RESULT.stages_completed)
-                  || (RESULT && RESULT.stages_completed) || [1];
+        const done = completedStages();
         const todo = sections().filter(n => done.indexOf(n) < 0);
         STAGE = todo.length ? todo[0] : sections()[sections().length - 1];
         screen = 0; startedAt = Date.now();
@@ -1187,7 +1174,7 @@
         drawScreen();
       });
       app.querySelectorAll('[data-cut]').forEach(b => b.onclick = () => {
-        activeCut = b.dataset.cut; drawResults(); window.scrollTo({top:0,behavior:'smooth'}); });
+        activeCut = b.dataset.cut; drawResults(); toTop(true); });
       app.querySelectorAll('[data-tip]').forEach(el => {
         el.style.cursor='crosshair';
         el.addEventListener('mousemove', e => { tip.innerHTML = el.dataset.tip; tip.style.opacity=1;
@@ -1195,83 +1182,6 @@
           tip.style.top = (e.clientY - 34) + 'px'; });
         el.addEventListener('mouseleave', () => tip.style.opacity = 0);
       });
-      const send = $('#askSend');
-      if (send) send.onclick = async () => {
-        const email = ($('#askEmail').value || '').trim();
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
-          const e = app.querySelector('[data-err="email"]');
-          e.textContent = 'Please enter a valid email address.'; e.classList.add('on'); return;
-        }
-        send.disabled = true; send.innerHTML = '<span class="spin"></span> Sending…';
-        const panel = $('#askPanel').checked;
-
-        // The database first, HubSpot second. Before this the only place the address
-        // went was a HubSpot post that isn't configured yet, so the screen said
-        // "we've recorded your request" while recording nothing. Blockers stop
-        // api.hsforms.com often enough that this would still be the right order once
-        // HubSpot is wired up.
-        let rec = null;
-        try {
-          rec = await rpc('record_report_request', {
-            p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
-            p_email: email, p_panel_opt_in: panel, p_source: answers.__source });
-        } catch (e) { rec = null; }
-
-        if (!rec || rec.ok === false){
-          const e = app.querySelector('[data-err="email"]');
-          e.textContent = rec && rec.error === 'bad_email'
-            ? "That address doesn't look right — could you check it?"
-            : rec && rec.error === 'rate_limited'
-              ? "We already have that request. Nothing else to do."
-              : 'We could not save that just now. Please try again in a moment.';
-          e.classList.add('on');
-          send.disabled = false; send.innerHTML = 'Send me the report';
-          return;
-        }
-
-        const ok = await sendToHubSpot(email, panel);
-        try {
-          rpc('mark_report_request_delivered', {
-            p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
-            p_delivered: !!ok }).catch(()=>{});
-        } catch (e) {}
-
-        const done = $('#askDone');
-        done.style.display = 'block';
-        // True whether or not HubSpot took it, because the database has it either way.
-        done.innerHTML = `<b>Done.</b> We'll email the report to ${email} when it publishes.`;
-        send.style.display = 'none';
-      };
-    }
-
-    async function sendToHubSpot(email, panelOptIn){
-      const { portalId, formGuid } = CONFIG.hubspot;
-      if (!portalId || !formGuid){
-        // Not configured yet. Fail visibly in the console rather than silently.
-        console.warn('[CSC] HubSpot not configured — set CONFIG.hubspot.portalId and formGuid.');
-        return false;
-      }
-      const hutk = (document.cookie.match(/(?:^|; )hubspotutk=([^;]*)/) || [])[1];
-      try {
-        const r = await fetch(`https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            fields: [
-              { name:'email', value: email },
-              { name:'csc_module_a_completed', value:'true' },
-              { name:'csc_panel_opt_in', value: panelOptIn ? 'true' : 'false' }
-            ],
-            context: { hutk: hutk ? decodeURIComponent(hutk) : undefined,
-                       pageUri: location.href, pageName: 'CSC compensation benchmark — results' },
-            legalConsentOptions: { consent: {
-              consentToProcess: true,
-              text: 'I agree to receive the CSC Customer Success Compensation Report and related research updates.',
-              communications: [{ value:true, subscriptionTypeId: 999,
-                text:'Email me CSC research and reports.' }] } }
-          })
-        });
-        return r.ok;
-      } catch (e){ console.warn('[CSC] HubSpot submit failed', e); return false; }
     }
   }
 
