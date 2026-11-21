@@ -144,26 +144,36 @@
     }
     const sections   = () => moduleDef().sections || [];
     const sectionIx  = () => sections().indexOf(STAGE);
-    const nextSection = () => sections()[sectionIx() + 1];
-    const isLastSection = () => sectionIx() === sections().length - 1;
-    /* Core and pay share a display group, so the full survey still reads as one
-       opening section followed by five — which is what the respondent experiences,
-       since nothing is shown between them. */
-    function stageCount(){
-      const seen = {};
-      sections().forEach(n => { const st = stageDef(n) || {};
-        seen[st.display_group != null ? 'g' + st.display_group : 's' + n] = 1; });
-      return Object.keys(seen).length || 1;
+    let DONE = [];   // sections this respondent has completed, as the server reports them
+    const markDone = list => { if (Array.isArray(list)) DONE = list.slice(); };
+    const isDone = n => DONE.indexOf(n) >= 0;
+    /* The next section still to do: the first after this one in module order, then
+       any skipped earlier. Order alone stopped being enough once a respondent can
+       skip ahead to the pay section and come back for the rest. */
+    function nextSection(){
+      const s = sections(), i = s.indexOf(STAGE);
+      const open = n => n !== STAGE && !isDone(n);
+      return s.slice(i + 1).find(open) || s.find(open);
     }
+    const allDone = () => sections().every(isDone);
+    const isMulti = () => sections().length > 2;
+    const paySection = () => sections().find(n => ((stageDef(n) || {}).results || {}).mode === 'full');
+    /* Sections that share a display group and sit next to each other in the module
+       read as one section: in the pay module, core runs straight into pay with
+       nothing shown between them. Apart (pay last), they count separately. */
+    function runs(){
+      const out = [];
+      sections().forEach(n => {
+        const g = (stageDef(n) || {}).display_group, prev = out[out.length - 1];
+        if (prev && g != null && prev.g === g) prev.members.push(n);
+        else out.push({ g: g, members: [n] });
+      });
+      return out;
+    }
+    const stageCount = () => runs().length || 1;
     function stagePos(){
-      const seen = [];
-      for (const n of sections()){
-        const st = stageDef(n) || {};
-        const k = st.display_group != null ? 'g' + st.display_group : 's' + n;
-        if (seen.indexOf(k) < 0) seen.push(k);
-        if (n === STAGE) return seen.length;
-      }
-      return 1;
+      const i = runs().findIndex(r => r.members.indexOf(STAGE) >= 0);
+      return i < 0 ? 1 : i + 1;
     }
     const stageDef = n => (DEF.stages || []).find(x => x.n === n) || null;
 
@@ -235,6 +245,7 @@
         clearDraft();
         Object.assign(answers, PROGRESS.answers || {});
         const done = PROGRESS.stages_completed || [];
+        markDone(done);
         const todo = sections().filter(n => done.indexOf(n) < 0);
         // Someone who did the AI module and has come back for pay should not be
         // asked the core again — that is the entire point of one row per person.
@@ -324,8 +335,9 @@
         return render(`<div class="card"><h2>We couldn't load your results</h2>
           <p class="narr">${esc((r && r.message) || 'Please try again shortly.')}</p></div>`);
       }
+      markDone(r.stages_completed);
       if (r.cuts){
-        RESULT = r;
+        RESULT = r; FINAL = r.final || null;
         activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
           ? 'by_level' : 'by_economy';
         return drawResults();
@@ -352,10 +364,17 @@
       return out;
     }
 
+    /* show_if: {key: value} shows the question when that answer was given;
+       {key: [a, b]} shows it when any of them was. "Looking for another job" is
+       asked only of people who want to move companies, either way. */
+    function shownBy(cond){
+      return Object.entries(cond).every(([k, v]) =>
+        Array.isArray(v) ? v.indexOf(answers[k]) >= 0 : answers[k] === v);
+    }
+
     function questionsFor(i){
       const sc = screensFor(STAGE)[i] || [];
-      return sc.filter(q => !q.show_if ||
-        Object.entries(q.show_if).every(([k,v]) => answers[k] === v));
+      return sc.filter(q => !q.show_if || shownBy(q.show_if));
     }
 
     function fieldHTML(q){
@@ -457,11 +476,9 @@
        nothing between them, so the progress bar runs across both. Restarting it
        at the first pay question would read as starting over. */
     function groupProgress(){
-      const g = (stageDef(STAGE) || {}).display_group;
-      const group = g == null ? [STAGE]
-        : sections().filter(n => (stageDef(n) || {}).display_group === g);
+      const run = runs().find(r => r.members.indexOf(STAGE) >= 0) || { members: [STAGE] };
       let total = 0, done = 0;
-      group.forEach(n => {
+      run.members.forEach(n => {
         if (n === STAGE) done = total + screen;
         total += screensFor(n).length;
       });
@@ -625,7 +642,7 @@
       const payload = {};
       ((stageDef(n) || {}).questions || []).forEach(q => {
         const shown = !q.show_if ||
-          Object.entries(q.show_if).every(([k,v]) => answers[k] === v);
+          shownBy(q.show_if);
         if (shown && answers[q.key] !== undefined) payload[q.key] = answers[q.key];
       });
       return payload;
@@ -651,6 +668,7 @@
         });
         if (!r || r.ok === false) return submitFailed(r);
         clearDraft();                       // the server has the core now
+        markDone(r.stages_completed);
         // No results screen here, by design: the payoff is one section away.
         const nx = nextSection();
         if (!nx) return drawStopped();
@@ -698,8 +716,9 @@
           p_survey_slug: CONFIG.slug, p_anon_token: deviceToken(),
           p_stage: STAGE, p_answers: payload, p_duration_ms: Date.now() - startedAt });
         if (!r || r.ok === false) return submitFailed(r);
+        markDone(r.stages_completed);
         if (isPay){
-          RESULT = r;
+          RESULT = r; FINAL = r.final || null;
           activeCut = r.cuts.by_level && r.cuts.by_level.available && !r.cuts.by_level.unclassified
             ? 'by_level' : 'by_economy';
           return drawResults();
@@ -804,19 +823,23 @@
     /* Headlines carry {placeholders} that name keys in the payload. */
     function fillHeadline(c){
       const h = c.headline || '';
-      return h.replace(/\{(\w+)\}/g, (m, k) => c[k] != null ? c[k] : '');
+      // share_* values are percentages. Without the sign, "{share_your_answer} of
+      // your peers" reads as a head count, which is both wrong and against house style.
+      return h.replace(/\{(\w+)\}/g, (m, k) =>
+        c[k] == null ? '' : (/^share/.test(k) && !/%/.test(h.slice(h.indexOf(m) + m.length, h.indexOf(m) + m.length + 1))
+                             ? c[k] + '%' : c[k]));
     }
 
     function drawStageResults(){
       const cuts = STAGE_RESULT.results || {};
       const res = cuts[activeCut] || cuts.by_level || cuts.by_economy || {};
       const sd = stageDef(STAGE) || {};
-      const last = isLastSection();
-      const isFull = MODULE === 'full';
+      const last = allDone();
+      const isFull = isMulti();
       const cutOk = k => cuts[k] && cuts[k].hero && cuts[k].hero.available !== false;
 
       render(`
-        <div class="title">${last && isFull ? "Here's the whole picture" : sd.title}</div>
+        <div class="title">${sd.title}</div>
         ${stageBar()}
         <div class="seg" role="group">
           ${(DEF.display_cuts||[]).map(c => `<button data-scut="${c.key}"
@@ -843,22 +866,34 @@
         STAGE = nextSection(); screen = 0; startedAt = Date.now(); drawScreen(); };
       const stop = $('#stageStop');
       if (stop) stop.onclick = () => { logEvent('leave_click'); drawStopped(); };
+      const skip = $('#stageSkip');
+      if (skip) skip.onclick = () => {
+        logEvent('skip_to_pay');
+        STAGE = paySection(); screen = 0; startedAt = Date.now(); drawScreen(); };
       wireResults();
       logEvent('results_view');
       toTop();
     }
 
     function continueHTML(){
-      const next = stageDef(nextSection()) || {};
+      const nx = nextSection(), next = stageDef(nx) || {};
+      const pay = paySection();
+      // Pay still to come, and not next: say it's at the end, and let anyone about
+      // to leave go straight to it instead. Leaving loses the salary; skipping keeps it.
+      const payLater = pay && !isDone(pay) && nx !== pay;
       return `<div class="card">
         <h2>Next: ${next.title || ''}</h2>
         <p class="narr">${next.subtitle || ''} About
           ${Math.max(1, Math.round((next.estimated_seconds||60)/60))} minute${
-          (next.estimated_seconds||60) >= 90 ? 's' : ''}.</p>
+          (next.estimated_seconds||60) >= 90 ? 's' : ''}.${payLater ? ' Your pay comparison comes at the end.' : ''}</p>
         <div class="nav" style="margin-top:14px">
           <button class="btn pri" type="button" id="stageGo">Keep going</button>
           <button class="btn" type="button" id="stageStop">I'm done for now</button>
-        </div></div>`;
+        </div>
+        ${payLater ? `<button type="button" id="stageSkip" style="background:none;border:0;padding:0;margin-top:16px;
+          font:inherit;font-size:14px;color:var(--accent);text-decoration:underline;cursor:pointer">
+          Skip straight to the pay questions</button>` : ''}
+      </div>`;
     }
 
     function drawStopped(){
@@ -1074,6 +1109,7 @@
         </div>
       </div>
 
+      ${allDone() && isMulti() ? finalHTML() : ''}
       ${continuePromptHTML()}
       ${unlockHTML(otherCut)}
       ${asksHTML()}`);
@@ -1092,17 +1128,19 @@
       if (!nx) return crossSellHTML();      // end of a short module
       const cp = (stageDef(STAGE) || {}).continue_prompt;
       const nd = stageDef(nx) || {};
-      const left = sections().length - sectionIx() - 1;
+      // Counted, not taken from the definition: with skipping, "five more" may be wrong.
+      const left = sections().filter(n => !isDone(n)).length;
       return `<div class="card accent">
-        <h2>${cp ? cp.headline : 'Next: ' + (nd.title || '')}</h2>
+        <h2>${left > 1 ? left + ' more short sections' : 'One more short section'}</h2>
         <p class="narr">${cp ? cp.body : (nd.subtitle || '')}</p>
         <div class="nav" style="margin-top:14px">
-          <button class="btn pri" type="button" id="s1go">${cp ? cp.cta : 'Keep going'}</button>
-          ${left > 1 ? '' : `<button class="btn" type="button" id="s1stop">No thanks</button>`}
+          <button class="btn pri" type="button" id="s1go">Keep going</button>
+          <button class="btn" type="button" id="s1stop">No thanks</button>
         </div></div>`;
     }
 
     function completedStages(){
+      if (DONE.length) return DONE;
       return (STAGE_RESULT && STAGE_RESULT.stages_completed)
           || (RESULT && RESULT.stages_completed)
           || (PROGRESS && PROGRESS.stages_completed) || sections();
