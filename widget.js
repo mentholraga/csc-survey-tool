@@ -453,6 +453,21 @@
         <span class="pips">${pips}</span></div>`;
     }
 
+    /* Sections that share a display group (core and pay) run back to back with
+       nothing between them, so the progress bar runs across both. Restarting it
+       at the first pay question would read as starting over. */
+    function groupProgress(){
+      const g = (stageDef(STAGE) || {}).display_group;
+      const group = g == null ? [STAGE]
+        : sections().filter(n => (stageDef(n) || {}).display_group === g);
+      let total = 0, done = 0;
+      group.forEach(n => {
+        if (n === STAGE) done = total + screen;
+        total += screensFor(n).length;
+      });
+      return { total: total, done: done };
+    }
+
     function drawScreen(){
       // The results footer lives outside #app and persists across renders, so it has
       // to be cleared by hand.
@@ -469,8 +484,9 @@
         ${!veryFirst && first ? `<div class="title">${sd.title}</div>
            <p class="lede">${sd.subtitle || ''}</p>` : ''}
         ${stageBar()}
-        <div class="prog" role="progressbar" aria-valuenow="${screen+1}" aria-valuemax="${scr.length}">
-          ${scr.map((_,i)=>`<i class="${i<=screen?'on':''}"></i>`).join('')}</div>
+        ${(() => { const gp = groupProgress();
+          return `<div class="prog" role="progressbar" aria-valuenow="${gp.done+1}" aria-valuemax="${gp.total}">
+          ${Array.from({ length: gp.total }, (_, i) => `<i class="${i <= gp.done ? 'on' : ''}"></i>`).join('')}</div>`; })()}
         <div class="card">${qs.map(fieldHTML).join('')}</div>
         <div class="hp"><label>Leave this empty<input type="text" id="hp" tabindex="-1" autocomplete="off"></label></div>
         <div class="nav">
