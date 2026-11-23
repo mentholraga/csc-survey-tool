@@ -878,8 +878,9 @@
     function continueHTML(){
       const nx = nextSection(), next = stageDef(nx) || {};
       const pay = paySection();
-      // Pay still to come, and not next: say it's at the end, and let anyone about
-      // to leave go straight to it instead. Leaving loses the salary; skipping keeps it.
+      // Pay still to come, and not next: say it's at the end, and offer to go
+      // straight to it. There is deliberately no "done for now" button here: closing
+      // the tab still saves progress, and the only exit offered keeps the salary.
       const payLater = pay && !isDone(pay) && nx !== pay;
       return `<div class="card">
         <h2>Next: ${next.title || ''}</h2>
@@ -888,11 +889,8 @@
           (next.estimated_seconds||60) >= 90 ? 's' : ''}.${payLater ? ' Your pay comparison comes at the end.' : ''}</p>
         <div class="nav" style="margin-top:14px">
           <button class="btn pri" type="button" id="stageGo">Keep going</button>
-          <button class="btn" type="button" id="stageStop">I'm done for now</button>
+          ${payLater ? `<button class="btn" type="button" id="stageSkip">Skip to the pay questions</button>` : ''}
         </div>
-        ${payLater ? `<button type="button" id="stageSkip" style="background:none;border:0;padding:0;margin-top:16px;
-          font:inherit;font-size:14px;color:var(--accent);text-decoration:underline;cursor:pointer">
-          Skip straight to the pay questions</button>` : ''}
       </div>`;
     }
 
@@ -1135,7 +1133,6 @@
         <p class="narr">${cp ? cp.body : (nd.subtitle || '')}</p>
         <div class="nav" style="margin-top:14px">
           <button class="btn pri" type="button" id="s1go">Keep going</button>
-          <button class="btn" type="button" id="s1stop">No thanks</button>
         </div></div>`;
     }
 
